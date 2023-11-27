@@ -70,7 +70,7 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.SpSummon, CardId.Ranryu);
             AddExecutor(ExecutorType.SpSummon, CardId.InariFire);
             AddExecutor(ExecutorType.SpSummon, CardId.NefariousArchFiend_Eater);
-            AddExecutor(ExecutorType.SpSummon, CardId.AwakeningNefariouserArch, Summon_AwakeningNefariouserArch);
+            AddExecutor(ExecutorType.Activate, CardId.NefariousArchFiend_Eater, NefariousArchFiend_Eater_Effect);
 
             //Traps
             AddExecutor(ExecutorType.Activate, CardId.SpellbookOfKnowledge, SpellbookOfKnowledge);
