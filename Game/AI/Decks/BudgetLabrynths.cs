@@ -82,8 +82,8 @@ namespace WindBot.Game.AI.Decks
             {
                 if (problemMonster != null) return true;
                 else if (ProtectLadyLabrynth()) return true;
+                else if (Bot.GetFieldCount() == 0) return true;
             }
-                
 
             return false;
         }
@@ -96,6 +96,7 @@ namespace WindBot.Game.AI.Decks
             {
                 if (problemMonster != null) return true;
                 else if (problemMonster == null && ProtectLadyLabrynth()) return true;
+                else if (Bot.GetFieldCount() == 0) return true;
             }
 
             return false;
@@ -153,8 +154,13 @@ namespace WindBot.Game.AI.Decks
 
         private bool LabrynthLabyrinthActivate()
         {
-            if (SpellActivate()) return true;
-            else return false;
+            //if (SpellActivate()) return true;
+            //else return false;
+
+            if (!Bot.HasInSpellZone(CardID.LABRYNTH_LABYRINTH)) return true;
+            else if (Bot.HasInSpellZone(CardID.LABRYNTH_LABYRINTH) && Card.Location == CardLocation.SpellZone && Card.IsFacedown()) return true;
+
+            return false;
         }
 
         private bool SpellActivate()
@@ -275,8 +281,10 @@ namespace WindBot.Game.AI.Decks
                 if (!Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH)) AI.SelectCard(CardID.WELCOME_LABYRINTH);
                 else AI.SelectCard(CardID.ERADICATOR_EPIDEMIC_VIRUS);
             }
-            else if (enemySpellZone.Count() > 1 && Bot.HasInMonstersZone(CardID.LOVELY_LABRYNTH)) AI.SelectCard(CardID.ERADICATOR_EPIDEMIC_VIRUS);
-            else AI.SelectCard(prefferedTraps);
+            else if (enemySpellZone.Count() > 1 && Bot.HasInMonstersZone(CardID.LOVELY_LABRYNTH))
+                AI.SelectCard(CardID.ERADICATOR_EPIDEMIC_VIRUS);
+            else
+                AI.SelectCard(prefferedTraps);
 
             LadyLabrynthActivated = true;
 
@@ -336,10 +344,13 @@ namespace WindBot.Game.AI.Decks
 
                     if (!Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH) && Bot.HasInHandOrInSpellZone(CardID.LABRYNTH_LABYRINTH))
                         AI.SelectNextCard(CardID.WELCOME_LABYRINTH);
-                    else if(!Bot.HasInHandOrInSpellZone(CardID.LABRYNTH_LABYRINTH) && Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH))
+                    else if (Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH) && Bot.HasInHandOrInSpellZone(CardID.LABRYNTH_LABYRINTH))
+                        return false;
+                    else
+                    {
                         AI.SelectNextCard(CardID.LABRYNTH_LABYRINTH);
-
-                    return true;
+                        return true;
+                    }
                 }
             }
             else if (Card.Location == CardLocation.Grave)
@@ -364,7 +375,7 @@ namespace WindBot.Game.AI.Decks
 
         public override CardPosition OnSelectPosition(int cardId, IList<CardPosition> positions)
         {
-            if (cardId == 27204312 || cardId == CardID.STOVIE_TORBIE)
+            if (cardId == 27204312 || cardId == CardID.STOVIE_TORBIE || cardId == CardID.COOCLOCK)
             {
                 return CardPosition.FaceUpDefence;
             }
@@ -553,13 +564,17 @@ namespace WindBot.Game.AI.Decks
 
                     if (!Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH) && Bot.HasInHandOrInSpellZone(CardID.LABRYNTH_LABYRINTH))
                         AI.SelectNextCard(CardID.WELCOME_LABYRINTH);
+                    else if (Bot.HasInHandOrInSpellZone(CardID.WELCOME_LABYRINTH) && Bot.HasInHandOrInSpellZone(CardID.LABRYNTH_LABYRINTH))
+                        return false;
                     else
+                    {
                         AI.SelectNextCard(CardID.LABRYNTH_LABYRINTH);
-
-                    return true;
+                        return true;
+                    }
                 }
             }
             else if (Card.Location == CardLocation.Grave) return true;
+            else if (Card.Location == CardLocation.MonsterZone && Bot.HasInSpellZone(CardID.LABRYNTH_LABYRINTH)) return true;
 
             return false;
         }
