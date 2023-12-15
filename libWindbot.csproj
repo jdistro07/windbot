@@ -47,6 +47,7 @@
   <ItemGroup>
 	<Compile Include="Config.cs" />
     <Compile Include="Game\AI\Deck.cs" />
+	<Compile Include="Game\AI\Decks\BudgetLabrynths.cs" />
     <Compile Include="Game\AI\Decks\ABCExecutor.cs" />
     <Compile Include="Game\AI\Decks\AltergeistExecutor.cs" />
     <Compile Include="Game\AI\Decks\FamiliarPossessedExecutor.cs" />
