@@ -139,8 +139,6 @@
     <None Include="COPYING">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Decks\AI_BudgetLabrynths.ydk" />
-    <None Include="Decks\Budget Labrynth.ydk" />
     <None Include="LICENSE">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
