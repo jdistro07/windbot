@@ -460,22 +460,22 @@ namespace WindBot.Game.AI.Decks
             WelcomeLabrynthActivated = false;
         }
 
-        public override CardPosition OnSelectPosition(int CardId, IList<CardPosition> positions)
+        public override CardPosition OnSelectPosition(int CardID, IList<CardPosition> positions)
         {
-            if (CardId == 27204312 || CardId == CardId.STOVIE_TORBIE || CardId == CardId.COOCLOCK)
+            if (CardID == 27204312 || CardID == CardId.STOVIE_TORBIE || CardID == CardId.COOCLOCK)
             {
                 return CardPosition.FaceUpDefence;
             }
-            else if (CardId == CardId.LADY_LABRYNTH || CardId == CardId.LOVELY_LABRYNTH)
+            else if (CardID == CardId.LADY_LABRYNTH || CardID == CardId.LOVELY_LABRYNTH)
             {
                 return CardPosition.FaceUpAttack;
             }
-            else if ((CardId == CardId.ARIANNA || CardId == CardId.CHANDRAGLIER) && !Util.IsAllEnemyBetter())
+            else if ((CardID == CardId.ARIANNA || CardID == CardId.CHANDRAGLIER) && !Util.IsAllEnemyBetter())
             {
                 return CardPosition.FaceUpAttack;
             }
 
-            return base.OnSelectPosition(CardId, positions);
+            return base.OnSelectPosition(CardID, positions);
         }
 
         private bool SolemnStrikeActivate()
