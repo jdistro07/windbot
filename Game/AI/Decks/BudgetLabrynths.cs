@@ -11,56 +11,71 @@ namespace WindBot.Game.AI.Decks
         public BudgetLabrynths(GameAI ai, Duel duel)
         : base(ai, duel)
         {
-            AddExecutor(ExecutorType.Activate, CardId.NIBIRU);
 
+            // Break board
+            AddExecutor(ExecutorType.Activate, CardId.NIBIRU);
             AddExecutor(ExecutorType.GoToBattlePhase, EvenlyMatchedActivate);
             AddExecutor(ExecutorType.Activate);
 
-            AddExecutor(ExecutorType.Activate, CardId.POT_OF_PROSPERITY); // TODO
-
-            AddExecutor(ExecutorType.Activate, CardId.LABRYNTH_LABYRINTH, LabrynthLabyrinthActivate);
-
+            // Setup
+            AddExecutor(ExecutorType.Activate, CardId.POT_OF_PROSPERITY);
             AddExecutor(ExecutorType.SpellSet, CardId.WELCOME_LABYRINTH, WelcomeLabrynthSet);
-            AddExecutor(ExecutorType.Activate, CardId.WELCOME_LABYRINTH, WelcomeLabrynthActivate);
 
-            AddExecutor(ExecutorType.Activate, CardId.COOCLOCK, CooclockEffect);
-
+            // Activate furnitures to supplement board setup
             AddExecutor(ExecutorType.Activate, CardId.STOVIE_TORBIE, StovieTorbieEffect);
-
-            AddExecutor(ExecutorType.Summon, CardId.CHANDRAGLIER, ChandraglierSummon);
             AddExecutor(ExecutorType.Activate, CardId.CHANDRAGLIER, ChandraglierEffect);
 
+            //Labrynth Spell Traps
+            AddExecutor(ExecutorType.Activate, CardId.LABRYNTH_LABYRINTH, LabrynthLabyrinthActivate);
+            AddExecutor(ExecutorType.Activate, CardId.COOCLOCK, CooclockEffect);
+
+            // Monster summons and effects
+            AddExecutor(ExecutorType.Summon, CardId.CHANDRAGLIER, FunitureSummon);
+            AddExecutor(ExecutorType.Summon, CardId.CHANDRAGLIER, FunitureSummon);
             AddExecutor(ExecutorType.Summon, CardId.ARIANNA);
             AddExecutor(ExecutorType.Activate, CardId.ARIANNA, AriannaEffect);
-            AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
 
-            AddExecutor(ExecutorType.SpSummon, CardId.MUCKRACKER, MuckarackerLinkSummon);
-            AddExecutor(ExecutorType.Activate, CardId.MUCKRACKER, MuckarackerEffect);
-
-            AddExecutor(ExecutorType.SpellSet, CardId.DOGMATIKA_PUNISHMENT, DogmatikaSet);
-            AddExecutor(ExecutorType.Activate, CardId.DOGMATIKA_PUNISHMENT, DogmatikaPunishmentActivate);
-
+            // Monster Activations
             AddExecutor(ExecutorType.Activate, CardId.LADY_LABRYNTH, LadyLabrynthActivate);
-            AddExecutor(ExecutorType.Repos, CardId.LADY_LABRYNTH, LadyLabrynthRepos);
-
             AddExecutor(ExecutorType.Activate, CardId.LOVELY_LABRYNTH, LovelyLabrynthEffect);
-
             AddExecutor(ExecutorType.Activate, CardId.ASH_BLOSSOM, DefaultAshBlossomAndJoyousSpring);
 
-            AddExecutor(ExecutorType.SpellSet, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacDeviceSet);
-            AddExecutor(ExecutorType.Activate, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacuationDeviceActivate);
-
-            AddExecutor(ExecutorType.SpellSet, CardId.SOLEMN_STRIKE);
-            AddExecutor(ExecutorType.Activate, CardId.SOLEMN_STRIKE, DefaultSolemnStrike);
-
-            AddExecutor(ExecutorType.SpellSet, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorSet);
-            AddExecutor(ExecutorType.Activate, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorActivate);
-
-            AddExecutor(ExecutorType.Activate, CardId.WIND_PEGASUS_IGNISTER, WindPegasusIngisterEffect);
-            AddExecutor(ExecutorType.Activate, CardId.ELDER_ENTITY_NTSS, ElderEntityNtssEffect);
-
+            // Link monsters summon and effects
+            AddExecutor(ExecutorType.SpSummon, CardId.MUCKRACKER, MuckarackerLinkSummon);
+            AddExecutor(ExecutorType.Activate, CardId.MUCKRACKER, MuckarackerEffect);
             AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_LinkSummon);
             AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_Effect);
+
+            // Backrow setup
+            AddExecutor(ExecutorType.SpellSet, CardId.DOGMATIKA_PUNISHMENT, DogmatikaSet);
+            AddExecutor(ExecutorType.SpellSet, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacDeviceSet);
+            AddExecutor(ExecutorType.Activate, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacuationDeviceActivate);
+            AddExecutor(ExecutorType.SpellSet, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorSet);
+            AddExecutor(ExecutorType.SpellSet, CardId.SOLEMN_STRIKE);
+
+            // Backrow activations
+            AddExecutor(ExecutorType.Activate, CardId.DOGMATIKA_PUNISHMENT, DogmatikaPunishmentActivate);
+            AddExecutor(ExecutorType.Activate, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorActivate);
+            AddExecutor(ExecutorType.Activate, CardId.WELCOME_LABYRINTH, WelcomeLabrynthActivate);
+            AddExecutor(ExecutorType.Activate, CardId.SOLEMN_STRIKE, DefaultSolemnStrike);
+
+            // GY effects
+            AddExecutor(ExecutorType.Activate, CardId.ELDER_ENTITY_NTSS, ElderEntityNtssEffect);
+            AddExecutor(ExecutorType.Activate, CardId.WIND_PEGASUS_IGNISTER, WindPegasusIngisterEffect);
+
+            // Finalize monster positions
+            AddExecutor(ExecutorType.Repos, CardId.LADY_LABRYNTH, LadyLabrynthRepos);
+            AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
+
+
+        }
+
+        private bool FunitureSummon()
+        {
+            if (Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count() == 0 || Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                return true;
+
+            return false;
         }
 
         private bool WelcomeLabrynthSet()
@@ -114,6 +129,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool LadyLabrynthActivated = false;
         private bool WelcomeLabrynthActivated = false;
+        private bool ArrianaActivated = false;
 
         private List<int> PrefferedDiscardCost()
         {
@@ -326,7 +342,7 @@ namespace WindBot.Game.AI.Decks
                 CardId.COOCLOCK
             };
 
-            if (bot_HandCards >= 1 && !Bot.HasInMonstersZone(CardId.MUCKRACKER))
+            if (bot_HandCards >= 1 && !Bot.HasInMonstersZone(CardId.MUCKRACKER) && bot_Monsters > 1)
             {
                 AI.SelectMaterials(materials);
                 return true;
@@ -441,7 +457,7 @@ namespace WindBot.Game.AI.Decks
                 else if (Bot.HasInHand(CardId.LABRYNTH_LABYRINTH) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.LABRYNTH_LABYRINTH)).Count() > 1)
                     cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
                 else if (Bot.HasInHand(CardId.STOVIE_TORBIE) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.STOVIE_TORBIE)).Count() > 1)
-                    cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
+                    cost_candidates.Add(CardId.STOVIE_TORBIE);
                 else if (Duel.Turn > 2)
                     cost_candidates.Add(CardId.NIBIRU);
                 else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY });
@@ -500,6 +516,7 @@ namespace WindBot.Game.AI.Decks
         {
             LadyLabrynthActivated = false;
             WelcomeLabrynthActivated = false;
+            ArrianaActivated = false;
         }
 
         public override CardPosition OnSelectPosition(int CardID, IList<CardPosition> positions)
@@ -586,11 +603,14 @@ namespace WindBot.Game.AI.Decks
 
             List<int> preferred_Monsters = new List<int>();
 
-            if (Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.LADY_LABRYNTH) || Duel.IsFirst)
+            if (!Bot.HasInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH))
                 preferred_Monsters.Add(CardId.LOVELY_LABRYNTH);
-            else if (Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH))
+
+            if (!Bot.HasInHandOrHasInMonstersZone(CardId.LADY_LABRYNTH))
                 preferred_Monsters.Add(CardId.LADY_LABRYNTH);
-            else preferred_Monsters.Add(CardId.ARIANNA);
+
+            if(Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.LADY_LABRYNTH) && Bot.HasInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH) || ArrianaActivated != false)
+                preferred_Monsters.Add(CardId.ARIANNA);
 
             AI.SelectCard(preferred_Monsters);
 
@@ -639,6 +659,8 @@ namespace WindBot.Game.AI.Decks
             else
                 AI.SelectCard(other_prefferedCards);
 
+            ArrianaActivated = true;
+
             return true;
         }
 
@@ -679,7 +701,7 @@ namespace WindBot.Game.AI.Decks
                 else if (Bot.HasInHand(CardId.LABRYNTH_LABYRINTH) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.LABRYNTH_LABYRINTH)).Count() > 1)
                     cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
                 else if (Bot.HasInHand(CardId.STOVIE_TORBIE) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.STOVIE_TORBIE)).Count() > 1)
-                    cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
+                    cost_candidates.Add(CardId.STOVIE_TORBIE);
                 else if (Duel.Turn > 2)
                     cost_candidates.Add(CardId.NIBIRU);
                 else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY });
