@@ -5,7 +5,7 @@ using YGOSharp.OCGWrapper.Enums;
 
 namespace WindBot.Game.AI.Decks
 {
-    [Deck("BudgetLabrynths", "AI_BudgetLabrynths")]
+    [Deck("Budget Labrynths", "AI_BudgetLabrynths")]
     public class BudgetLabrynths : DefaultExecutor
     {
         public BudgetLabrynths(GameAI ai, Duel duel)
