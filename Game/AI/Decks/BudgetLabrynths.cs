@@ -18,7 +18,8 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate);
 
             // Setup
-            AddExecutor(ExecutorType.Activate, CardId.POT_OF_PROSPERITY);
+            AddExecutor(ExecutorType.Activate, CardId.POT_OF_PROSPERITY, PotOfProsperityActivate);
+            AddExecutor(ExecutorType.Activate, CardId.LORD_OF_HEAVENLY_PRISON, LordOfHeavenlyPrisonActivate);
             AddExecutor(ExecutorType.SpellSet, CardId.WELCOME_LABYRINTH, WelcomeLabrynthSet);
 
             // Activate furnitures to supplement board setup
@@ -41,17 +42,18 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate, CardId.ASH_BLOSSOM, DefaultAshBlossomAndJoyousSpring);
 
             // Link monsters summon and effects
+            AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_LinkSummon);
+            AddExecutor(ExecutorType.Activate, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_Effect);
             AddExecutor(ExecutorType.SpSummon, CardId.MUCKRACKER, MuckarackerLinkSummon);
             AddExecutor(ExecutorType.Activate, CardId.MUCKRACKER, MuckarackerEffect);
-            AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_LinkSummon);
-            AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_Effect);
 
             // Backrow setup
+            AddExecutor(ExecutorType.SpellSet, EvenlyMatchedSet);
             AddExecutor(ExecutorType.SpellSet, CardId.DOGMATIKA_PUNISHMENT, DogmatikaSet);
             AddExecutor(ExecutorType.SpellSet, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacDeviceSet);
             AddExecutor(ExecutorType.Activate, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacuationDeviceActivate);
             AddExecutor(ExecutorType.SpellSet, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorSet);
-            AddExecutor(ExecutorType.SpellSet, CardId.SOLEMN_STRIKE);
+            AddExecutor(ExecutorType.SpellSet, CardId.SOLEMN_STRIKE, SolemnStrikeSet);
 
             // Backrow activations
             AddExecutor(ExecutorType.Activate, CardId.DOGMATIKA_PUNISHMENT, DogmatikaPunishmentActivate);
@@ -62,12 +64,139 @@ namespace WindBot.Game.AI.Decks
             // GY effects
             AddExecutor(ExecutorType.Activate, CardId.ELDER_ENTITY_NTSS, ElderEntityNtssEffect);
             AddExecutor(ExecutorType.Activate, CardId.WIND_PEGASUS_IGNISTER, WindPegasusIngisterEffect);
+            AddExecutor(ExecutorType.Activate, CardId.TRIBRIGADE_ARMS_BUCEPHALUS_II, TririgadeArmsEffect);
+            AddExecutor(ExecutorType.Activate, CardId.GARURA);
 
             // Finalize monster positions
             AddExecutor(ExecutorType.Repos, CardId.LADY_LABRYNTH, LadyLabrynthRepos);
             AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
+        }
 
+        private bool EvenlyMatchedSet()
+        {
+            if(Util.IsAllEnemyBetter() && Bot.Hand.GetCardCount(CardId.EVENLY_MATCHED) > 1 && Bot.GetFieldCount() != 0 && ProtectLadyLabrynth())
+                return true;
 
+            return false;
+        }
+
+        private bool SolemnStrikeSet()
+        {
+            if (Card.Location == CardLocation.Hand)
+            {
+                AI.SelectPlace(SelectSTPlace(Card, true));
+                return true;
+            }
+
+            return true;
+        }
+
+        private bool WelcomeLabrynthActivated = false;
+        private bool ArrianaActivated = false;
+        private bool LadyLabrynthActivated = false;
+
+        List<int> Impermanence_list = new List<int>();
+
+        public override void OnSelectChain(IList<ClientCard> cards)
+        {
+            foreach (var imperm in cards.GetMatchingCards(card => card.IsCode(10045474)))
+            {
+                Impermanence_list.Add(10045474); // Imperm ID
+            }
+
+            base.OnSelectChain(cards);
+        }
+
+        public int SelectSTPlace(ClientCard card = null, bool avoid_Impermanence = false)
+        {
+            List<int> list = new List<int> { 0, 1, 2, 3, 4 };
+            int n = list.Count;
+            while (n-- > 1)
+            {
+                int index = Program.Rand.Next(n + 1);
+                int temp = list[index];
+                list[index] = list[n];
+                list[n] = temp;
+            }
+            foreach (int seq in list)
+            {
+                int zone = (int)System.Math.Pow(2, seq);
+                if (Bot.SpellZone[seq] == null)
+                {
+                    if (card != null && card.Location == CardLocation.Hand && avoid_Impermanence && Impermanence_list.Contains(seq)) continue;
+                    return zone;
+                };
+            }
+            return 0;
+        }
+
+        private bool PotOfProsperityActivate()
+        {
+            if (Bot.ExtraDeck.Count <= 3) return false;
+
+            int[] cost = new int[] {
+                CardId.IP_MASQUERENA,
+                CardId.LINKURIBOH,
+                CardId.MUCKRACKER,
+                CardId.KNIGHTMARE_UNICORN,
+                CardId.KNIGHTMARE_PHEONIX,
+                CardId.COSMIC_BLAZAR_DRAGON
+            };
+
+            AI.SelectCard(cost);
+
+            List<int> prefferedCard = new List<int>();
+
+            if (!Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.WELCOME_LABYRINTH))
+                prefferedCard.Add(CardId.WELCOME_LABYRINTH);
+            else if (!Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.LADY_LABRYNTH))
+                prefferedCard.Add(CardId.LADY_LABRYNTH);
+            else if (!Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.ERADICATOR_EPIDEMIC_VIRUS))
+                prefferedCard.Add(CardId.ERADICATOR_EPIDEMIC_VIRUS);
+            else if (Enemy.GetFieldCount() > 1 && Bot.HasInExtra(CardId.ELDER_ENTITY_NTSS) && !Bot.HasInHandOrInGraveyard(CardId.DOGMATIKA_PUNISHMENT))
+                prefferedCard.Add(CardId.DOGMATIKA_PUNISHMENT);
+            else if (Enemy.GetFieldCount() > 1 && Bot.HasInExtra(CardId.ELDER_ENTITY_NTSS) && !Bot.HasInHandOrInGraveyard(CardId.COMPULSORY_EVACUATION_DEVICE) && Bot.HasInMonstersZone(CardId.LOVELY_LABRYNTH) && Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                prefferedCard.Add(CardId.COMPULSORY_EVACUATION_DEVICE);
+            else if (!Bot.HasInHand(CardId.ASH_BLOSSOM))
+                prefferedCard.Add(CardId.ASH_BLOSSOM);
+            else if (!Bot.HasInHandOrHasInMonstersZone(CardId.ARIANNA))
+                prefferedCard.Add(CardId.ARIANNA);
+            else if (!Bot.HasInHandOrInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                prefferedCard.Add(CardId.LABRYNTH_LABYRINTH);
+            else if (!Bot.HasInHandOrInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                prefferedCard.Add(CardId.LABRYNTH_LABYRINTH);
+            else if (Bot.GetFieldCount() <= 1 && Util.IsAllEnemyBetter())
+                prefferedCard.Add(CardId.EVENLY_MATCHED);
+
+            AI.SelectNextCard(prefferedCard);
+
+            if (Card.Location == CardLocation.Hand)
+            {
+                AI.SelectPlace(SelectSTPlace(Card, true));
+            }
+
+            return true;
+        }
+
+        private bool LordOfHeavenlyPrisonActivate()
+        {
+            if (Card.Location == CardLocation.Hand && Duel.Player == 0)
+            {
+                if (Util.GetLastChainCard() != null)
+                {
+                    if (Util.GetLastChainCard().HasType(CardType.Spell) || Util.GetLastChainCard().HasType(CardType.Trap))
+                        return false;
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        private bool TririgadeArmsEffect()
+        {
+            AI.SelectCard(CardId.GARURA);
+            return true;
         }
 
         private bool FunitureSummon()
@@ -80,6 +209,11 @@ namespace WindBot.Game.AI.Decks
 
         private bool WelcomeLabrynthSet()
         {
+            if (Card.Location == CardLocation.Hand)
+            {
+                AI.SelectPlace(SelectSTPlace(Card, true));
+            }
+
             return !Bot.HasInSpellZone(CardId.WELCOME_LABYRINTH);
         }
 
@@ -102,34 +236,30 @@ namespace WindBot.Game.AI.Decks
 
         private bool KnightmarePheonix_LinkSummon()
         {
-            if(!Bot.HasInSpellZone(CardId.ERADICATOR_EPIDEMIC_VIRUS) && Util.GetBestEnemySpell() != null && Duel.Phase == DuelPhase.Main2)
+            if(Util.GetBestEnemySpell() == null)
                 return false;
 
-            if(Bot.MonsterZone.GetMatchingCards(card => card.Level <= 4).Count() < 2)
-                return false;
-
-            if(Bot.Hand.Count() == 0)
-                return false;
-
-            if (Enemy.SpellZone.Count() == 0)
-                return false;
-
-            int[] materials = new int[]
+            if ((Bot.HasInMonstersZone(CardId.CHANDRAGLIER)
+                || Bot.HasInMonstersZone(CardId.STOVIE_TORBIE)
+                || Bot.HasInMonstersZone(CardId.COOCLOCK))
+                && Bot.MonsterZone.Count() > 1
+                && Bot.Hand.Count() > 1
+                )
             {
-                CardId.STOVIE_TORBIE,
-                CardId.CHANDRAGLIER,
-                CardId.ARIANNA,
-                CardId.COOCLOCK
-            };
+                int[] materials = new int[]
+                {
+                    CardId.STOVIE_TORBIE,
+                    CardId.CHANDRAGLIER,
+                    CardId.COOCLOCK
+                };
 
-            AI.SelectMaterials(materials);
+                AI.SelectMaterials(materials);
 
-            return true;
+                return true;
+            }
+
+            return false;
         }
-
-        private bool LadyLabrynthActivated = false;
-        private bool WelcomeLabrynthActivated = false;
-        private bool ArrianaActivated = false;
 
         private List<int> PrefferedDiscardCost()
         {
@@ -143,6 +273,8 @@ namespace WindBot.Game.AI.Decks
                 cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
             else if (Bot.HasInHand(CardId.STOVIE_TORBIE) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.STOVIE_TORBIE)).Count() > 1)
                 cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
+            else if (Bot.HasInHand(CardId.LORD_OF_HEAVENLY_PRISON) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.LORD_OF_HEAVENLY_PRISON)).Count() > 1)
+                cost_candidates.Add(CardId.LORD_OF_HEAVENLY_PRISON);
             else if (Duel.Turn > 2)
                 cost_candidates.Add(CardId.NIBIRU);
             else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY });
@@ -154,19 +286,16 @@ namespace WindBot.Game.AI.Decks
         {
             int hand_enemySpells = Enemy.Hand.GetMatchingCards(card => card.HasType(CardType.Spell)).Count();
             int deck_enemySpells = Enemy.Deck.GetMatchingCards(card => card.HasType(CardType.Spell)).Count();
-            int grave_enemySpells = Enemy.Graveyard.GetMatchingCards(card => card.HasType(CardType.Spell)).Count();
-
 
             int hand_enemyTraps = Enemy.Hand.GetMatchingCards(card => card.HasType(CardType.Trap)).Count();
             int deck_enemyTraps = Enemy.Deck.GetMatchingCards(card => card.HasType(CardType.Trap)).Count();
-            int grave_enemyTraps = Enemy.Graveyard.GetMatchingCards(card => card.HasType(CardType.Trap)).Count();
 
 
-            int overallSpells = hand_enemySpells + deck_enemySpells + grave_enemySpells;
-            int overallTraps = hand_enemyTraps + deck_enemyTraps + grave_enemyTraps;
+            int overallSpells = hand_enemySpells + deck_enemySpells;
+            int overallTraps = hand_enemyTraps + deck_enemyTraps;
 
-            if (overallSpells > overallTraps) return 0; // Spells
-            else return 1; // Traps
+            if (overallSpells > overallTraps) return 1; // Spells
+            else return 2; // Traps
         }
 
         private bool CompulsoryEvacDeviceSet()
@@ -175,8 +304,15 @@ namespace WindBot.Game.AI.Decks
 
             if (!Bot.HasInSpellZone(CardId.DOGMATIKA_PUNISHMENT))
             {
-                if (problemMonster != null || ProtectLadyLabrynth() || Bot.GetFieldCount() == 0)
+                if (problemMonster != null || ProtectLadyLabrynth() || Bot.GetFieldCount() <= 1)
+                {
+                    if (Card.Location == CardLocation.Hand)
+                    {
+                        AI.SelectPlace(SelectSTPlace(Card, true));
+                    }
+
                     return true;
+                }
             }
 
             return false;
@@ -188,7 +324,12 @@ namespace WindBot.Game.AI.Decks
 
             if (!Bot.HasInSpellZone(CardId.DOGMATIKA_PUNISHMENT))
             {
-                if (problemMonster != null) return true;
+                if (Card.Location == CardLocation.Hand)
+                {
+                    AI.SelectPlace(SelectSTPlace(Card, true));
+                }
+
+                if (problemMonster != null || Bot.GetFieldCount() <= 1) return true;
                 else if (problemMonster == null && ProtectLadyLabrynth()) return true;
                 else if (Bot.GetFieldCount() == 0) return true;
             }
@@ -235,8 +376,8 @@ namespace WindBot.Game.AI.Decks
 
                 if (target != null)
                 {
-                    if (target.HasType(CardType.Spell)) AI.SelectOption(0);
-                    else AI.SelectOption(1);
+                    if (target.HasType(CardType.Spell)) AI.SelectOption(1);
+                    else AI.SelectOption(2);
                 }
                 else // if there are no backrows, decide if their build is more on spells or traps
                 {
@@ -300,6 +441,7 @@ namespace WindBot.Game.AI.Decks
                 return true;
             }
 
+            // Protect Key MOnsters
             if (Card.Location == CardLocation.MonsterZone)
             {
                 if (ActivateDescription == Util.GetStringId(CardId.MUCKRACKER, 0))
@@ -314,10 +456,11 @@ namespace WindBot.Game.AI.Decks
                                 CardId.CHANDRAGLIER,
                                 CardId.STOVIE_TORBIE,
                                 CardId.COOCLOCK,
-                                CardId.ARIANNA
+                                CardId.ARIANNA,
+                                CardId.MUCKRACKER
                             });
 
-                            AI.SelectCard(cost_candidates);
+                            AI.SelectThirdCard(cost_candidates);
 
                             return true;
                         }
@@ -339,14 +482,19 @@ namespace WindBot.Game.AI.Decks
                 CardId.STOVIE_TORBIE,
                 CardId.CHANDRAGLIER,
                 CardId.ARIANNA,
-                CardId.COOCLOCK
+                CardId.COOCLOCK,
+                CardId.KNIGHTMARE_PHEONIX,
+                CardId.KNIGHTMARE_UNICORN
             };
 
-            if (bot_HandCards >= 1 && !Bot.HasInMonstersZone(CardId.MUCKRACKER) && bot_Monsters > 1)
+            if (bot_HandCards >= 1 && !Bot.HasInMonstersZone(CardId.MUCKRACKER) && (Bot.HasInMonstersZoneOrInGraveyard(CardId.LADY_LABRYNTH) || Bot.HasInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH)))
             {
                 AI.SelectMaterials(materials);
                 return true;
             }
+
+            if (Bot.HasInMonstersZone(CardId.STOVIE_TORBIE) && Bot.HasInMonstersZone(CardId.CHANDRAGLIER))
+                return true;
 
             return false;
         }
@@ -364,7 +512,13 @@ namespace WindBot.Game.AI.Decks
                 IList<ClientCard> tributes = Bot.MonsterZone.GetMatchingCards(card => card.HasAttribute(CardAttribute.Dark) && card.Attack > 2500);
 
                 if (tributes.Count > 0)
-                    return true;
+                {
+                    if (Card.Location == CardLocation.Hand)
+                    {
+                        AI.SelectPlace(SelectSTPlace(Card, true));
+                        return true;
+                    }
+                }
             }
 
             return false;
@@ -407,8 +561,13 @@ namespace WindBot.Game.AI.Decks
                 || card.HasPosition(CardPosition.FaceDown)
             );
 
-            if(!Bot.HasInHandOrInSpellZoneOrInGraveyard(CardId.ERADICATOR_EPIDEMIC_VIRUS))
+            if (!Bot.HasInHandOrInSpellZoneOrInGraveyard(CardId.ERADICATOR_EPIDEMIC_VIRUS))
+            {
+                ClientCard eradicator = Bot.Deck.GetFirstMatchingCard(card => card.IsCode(CardId.ERADICATOR_EPIDEMIC_VIRUS));
                 AI.SelectCard(CardId.ERADICATOR_EPIDEMIC_VIRUS);
+                AI.SelectPlace(SelectSTPlace(eradicator, true));
+            }
+                
             else AI.SelectCard(prefferedTraps);
 
             LadyLabrynthActivated = true;
@@ -418,6 +577,11 @@ namespace WindBot.Game.AI.Decks
 
         private bool EvenlyMatchedActivate()
         {
+            if (Card.Location == CardLocation.Hand)
+            {
+                AI.SelectPlace(SelectSTPlace(Card, true));
+            }
+
             return Bot.HasInHand(CardId.EVENLY_MATCHED) && Duel.Turn >= 2 && Enemy.GetFieldCount() >= 2 && Bot.GetFieldCount() == 0;
         }
 
@@ -427,10 +591,19 @@ namespace WindBot.Game.AI.Decks
 
             if (problemMonster != null)
             {
-                if(!Enemy.IsFieldEmpty() && Enemy.GetFieldCount() > 1)
+                if (!Enemy.IsFieldEmpty() && Enemy.GetFieldCount() > 1)
                     AI.SelectCard(CardId.ELDER_ENTITY_NTSS);
                 else
-                    AI.SelectCard(CardId.WIND_PEGASUS_IGNISTER);
+                {
+                    List<int> prefferedMonsters = new List<int>
+                    {
+                        CardId.WIND_PEGASUS_IGNISTER,
+                        CardId.TRIBRIGADE_ARMS_BUCEPHALUS_II
+                    };
+
+                    AI.SelectCard(prefferedMonsters);
+                }
+                    
 
                 AI.SelectNextCard(problemMonster);
 
@@ -445,71 +618,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool StovieTorbieEffect()
         {
-            if (Card.Location == CardLocation.Hand && !Bot.HasInGraveyard(CardId.STOVIE_TORBIE))
-            {
-                // Look for duplicate copies of the same card or Chandraglier and use them as materials.
-                List<int> cost_candidates = new List<int>();
-
-                if (Bot.HasInHand(CardId.CHANDRAGLIER))
-                    cost_candidates.Add(CardId.CHANDRAGLIER);
-                else if (Bot.HasInHand(CardId.LOVELY_LABRYNTH))
-                    cost_candidates.Add(CardId.LOVELY_LABRYNTH);
-                else if (Bot.HasInHand(CardId.LABRYNTH_LABYRINTH) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.LABRYNTH_LABYRINTH)).Count() > 1)
-                    cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
-                else if (Bot.HasInHand(CardId.STOVIE_TORBIE) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.STOVIE_TORBIE)).Count() > 1)
-                    cost_candidates.Add(CardId.STOVIE_TORBIE);
-                else if (Duel.Turn > 2)
-                    cost_candidates.Add(CardId.NIBIRU);
-                else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY });
-
-                // Get the next Labrynth spell and trap
-                if (Duel.Player == 0)
-                {
-                    if (cost_candidates.Count() > 0)
-                {
-                    AI.SelectCard(cost_candidates);
-
-                    int remaining_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
-
-                    if (!Bot.HasInHandOrInSpellZone(CardId.WELCOME_LABYRINTH) && remaining_welcomes > 0)
-                    {
-                        AI.SelectNextCard(CardId.WELCOME_LABYRINTH);
-                        return true;
-                    }
-                    else if (!Bot.HasInHandOrInSpellZone(CardId.LABRYNTH_LABYRINTH))
-                    {
-                        AI.SelectNextCard(CardId.LABRYNTH_LABYRINTH);
-                        return true;
-                    }
-                }
-                }
-            }
-            else if (Card.Location == CardLocation.Grave)
-            {
-                if (Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH))
-                    return true;
-            }
-            else if (Card.Location == CardLocation.MonsterZone)
-            {
-                if (Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH))
-                {
-                    int remaining_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
-
-                    if (remaining_welcomes > 0)
-                    {
-                        AI.SelectNextCard(CardId.WELCOME_LABYRINTH);
-                        return true;
-                    }
-                    else return false;
-                }
-                else
-                {
-                    AI.SelectNextCard(CardId.LABRYNTH_LABYRINTH);
-                    return true;
-                }
-            }
-
-            return false;
+            return FurnitureActivation();
         }
 
         public override void OnNewTurn()
@@ -559,7 +668,12 @@ namespace WindBot.Game.AI.Decks
             };
 
             if (Bot.HasInGraveyard(CardId.ERADICATOR_EPIDEMIC_VIRUS))
+            {
+                ClientCard eradicator = Bot.Deck.GetFirstMatchingCard(card => card.IsCode(CardId.ERADICATOR_EPIDEMIC_VIRUS));
                 AI.SelectCard(CardId.ERADICATOR_EPIDEMIC_VIRUS);
+                AI.SelectPlace(SelectSTPlace(eradicator, true));
+            }
+                
             else
                 AI.SelectCard(supportTraps);
 
@@ -637,6 +751,10 @@ namespace WindBot.Game.AI.Decks
                     };
                 }
             }
+            else if (Card.Location == CardLocation.Grave)
+            {
+                AI.SelectPlace(SelectSTPlace(Card, true));
+            }
 
             return true;
         }
@@ -675,7 +793,11 @@ namespace WindBot.Game.AI.Decks
                     || card.IsCode(CardId.CHANDRAGLIER)
                 );
 
-            if (Card.Location == CardLocation.Hand && Bot.HasInSpellZone(CardId.WELCOME_LABYRINTH) && !WelcomeLabrynthActivated && Duel.Player == 0)
+            if (Card.Location == CardLocation.Hand
+                && (Bot.HasInSpellZone(CardId.WELCOME_LABYRINTH) || Bot.HasInSpellZone(CardId.ERADICATOR_EPIDEMIC_VIRUS))
+                && !WelcomeLabrynthActivated
+                && Duel.Player == 0
+                && Bot.MonsterZone.GetMatchingCards(card => card.HasRace(CardRace.Fiend)).Count() > 0)
                 return true;
             else if (Card.Location == CardLocation.Grave)
             {
@@ -689,7 +811,12 @@ namespace WindBot.Game.AI.Decks
 
         public bool ChandraglierEffect()
         {
-            if (Card.Location == CardLocation.Hand && !Bot.HasInGraveyard(CardId.CHANDRAGLIER))
+            return FurnitureActivation();
+        }
+
+        public bool FurnitureActivation()
+        {
+            if (Card.Location == CardLocation.Hand && Duel.Phase == DuelPhase.Main1 || Duel.Phase == DuelPhase.Main2)
             {
                 // Look for duplicate copies of the same card or Chandraglier and use them as materials.
                 List<int> cost_candidates = new List<int>();
@@ -702,9 +829,11 @@ namespace WindBot.Game.AI.Decks
                     cost_candidates.Add(CardId.LABRYNTH_LABYRINTH);
                 else if (Bot.HasInHand(CardId.STOVIE_TORBIE) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.STOVIE_TORBIE)).Count() > 1)
                     cost_candidates.Add(CardId.STOVIE_TORBIE);
+                else if (Bot.HasInHand(CardId.LORD_OF_HEAVENLY_PRISON) && Bot.Hand.GetMatchingCards(card => card.IsCode(CardId.LORD_OF_HEAVENLY_PRISON)).Count() > 1)
+                    cost_candidates.Add(CardId.LORD_OF_HEAVENLY_PRISON);
                 else if (Duel.Turn > 2)
                     cost_candidates.Add(CardId.NIBIRU);
-                else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY });
+                else cost_candidates.AddRange(new List<int>() { CardId.POT_OF_PROSPERITY, CardId.COOCLOCK });
 
                 // Get the next Labrynth spell and trap
 
@@ -714,18 +843,17 @@ namespace WindBot.Game.AI.Decks
                     {
                         AI.SelectCard(cost_candidates);
 
-                        int remaining_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
+                        int deck_remaining_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
 
-                        if (!Bot.HasInHandOrInSpellZone(CardId.WELCOME_LABYRINTH) && remaining_welcomes > 0)
+                        if (!Bot.HasInSpellZone(CardId.WELCOME_LABYRINTH))
                         {
                             AI.SelectNextCard(CardId.WELCOME_LABYRINTH);
-                            return true;
+                            AI.SelectPlace(SelectSTPlace(Bot.Deck.GetFirstMatchingCard(card => card.IsCode(CardId.WELCOME_LABYRINTH)), true));
                         }
                         else if (!Bot.HasInHandOrInSpellZone(CardId.LABRYNTH_LABYRINTH))
-                        {
                             AI.SelectNextCard(CardId.LABRYNTH_LABYRINTH);
-                            return true;
-                        }
+
+                        return true;
                     }
                 }
             }
@@ -740,7 +868,8 @@ namespace WindBot.Game.AI.Decks
                     {
                         AI.SelectNextCard(CardId.WELCOME_LABYRINTH);
                         return true;
-                    } else return false;
+                    }
+                    else return false;
                 }
                 else
                 {
@@ -763,6 +892,7 @@ namespace WindBot.Game.AI.Decks
             public const int ASH_BLOSSOM = 14558127;
             public const int STOVIE_TORBIE = 74018812;
             public const int COOCLOCK = 2511;
+            public const int LORD_OF_HEAVENLY_PRISON = 9822220;
 
             // spells and traps
             public const int POT_OF_PROSPERITY = 84211599;
@@ -776,13 +906,16 @@ namespace WindBot.Game.AI.Decks
 
             // EXTRA DECK
             public const int ELDER_ENTITY_NTSS = 80532587;
-            public const int COMSIC_BLAZAR_DRAGON = 21123811;
+            public const int COSMIC_BLAZAR_DRAGON = 21123811;
             public const int WIND_PEGASUS_IGNISTER = 98506199;
             public const int TRIBRIGADE_ARMS_BUCEPHALUS_II = 10019086;
             public const int KNIGHTMARE_PHEONIX = 2857636;
             public const int MUCKRACKER = 71607202;
             public const int IP_MASQUERENA = 65741786;
             public const int LINKURIBOH = 41999284;
+            public const int GARURA = 11765832;
+            public const int FIVE_HEADED_DRAGON = 99267150;
+            public const int KNIGHTMARE_UNICORN = 38342335;
 
         }
     }
