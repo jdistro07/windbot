@@ -44,6 +44,8 @@ namespace WindBot.Game.AI.Decks
             // Link monsters summon and effects
             AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_LinkSummon);
             AddExecutor(ExecutorType.Activate, CardId.KNIGHTMARE_PHEONIX, KnightmarePheonix_Effect);
+            AddExecutor(ExecutorType.SpSummon, CardId.KNIGHTMARE_UNICORN, KnightmareUnicorn_LinkSummon);
+            AddExecutor(ExecutorType.Activate, CardId.KNIGHTMARE_UNICORN, KnightmareUnicornEffect);
             AddExecutor(ExecutorType.SpSummon, CardId.MUCKRACKER, MuckarackerLinkSummon);
             AddExecutor(ExecutorType.Activate, CardId.MUCKRACKER, MuckarackerEffect);
 
@@ -54,6 +56,8 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate, CardId.COMPULSORY_EVACUATION_DEVICE, CompulsoryEvacuationDeviceActivate);
             AddExecutor(ExecutorType.SpellSet, CardId.ERADICATOR_EPIDEMIC_VIRUS, EradicatorSet);
             AddExecutor(ExecutorType.SpellSet, CardId.SOLEMN_STRIKE, SolemnStrikeSet);
+            AddExecutor(ExecutorType.SpellSet, CardId.EVENLY_MATCHED, EvenlyMatchedSet);
+
 
             // Backrow activations
             AddExecutor(ExecutorType.Activate, CardId.DOGMATIKA_PUNISHMENT, DogmatikaPunishmentActivate);
@@ -72,9 +76,56 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
         }
 
+        private bool KnightmareUnicornEffect()
+        {
+            IList<int> cost = PrefferedDiscardCost();
+            ClientCard target = Util.GetBestEnemyCard(true, true);
+
+            if (target != null)
+            {
+                // Discard cost
+                AI.SelectCard(cost);
+
+                // Target enemy best card
+                AI.SelectNextCard(target);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool KnightmareUnicorn_LinkSummon()
+        {
+            if (Util.IsAllEnemyBetter())
+            {
+                int bot_HandCards = Bot.Hand.Count();
+
+                int[] materials = new int[]
+                {
+                    CardId.STOVIE_TORBIE,
+                    CardId.CHANDRAGLIER,
+                    CardId.ARIANNA,
+                    CardId.COOCLOCK,
+                    CardId.KNIGHTMARE_PHEONIX
+                };
+
+                if ((Bot.HasInMonstersZone(CardId.STOVIE_TORBIE) || Bot.HasInMonstersZone(CardId.CHANDRAGLIER) || Bot.HasInMonstersZone(CardId.COOCLOCK))
+                    && (Bot.HasInMonstersZone(CardId.ARIANNA) || Bot.HasInMonstersZone(CardId.KNIGHTMARE_PHEONIX))
+                    && bot_HandCards >= 2
+                    )
+                {
+                    AI.SelectMaterials(materials);
+                    return true;
+                }    
+            }
+
+            return false;
+        }
+
         private bool EvenlyMatchedSet()
         {
-            if(Util.IsAllEnemyBetter() && Bot.Hand.GetCardCount(CardId.EVENLY_MATCHED) > 1 && Bot.GetFieldCount() != 0 && ProtectLadyLabrynth())
+            if(ProtectLadyLabrynth())
                 return true;
 
             return false;
@@ -330,7 +381,7 @@ namespace WindBot.Game.AI.Decks
                 }
 
                 if (problemMonster != null || Bot.GetFieldCount() <= 1) return true;
-                else if (problemMonster == null && ProtectLadyLabrynth()) return true;
+                else if (ProtectLadyLabrynth()) return true;
                 else if (Bot.GetFieldCount() == 0) return true;
             }
 
@@ -339,7 +390,7 @@ namespace WindBot.Game.AI.Decks
 
         public bool ProtectLadyLabrynth()
         {
-            return Bot.HasInMonstersZone(CardId.LADY_LABRYNTH);
+            return Bot.HasInMonstersZone(CardId.LADY_LABRYNTH) && Bot.SpellZone.Count() == 0;
         }
 
         private bool AriannaRepos()
@@ -509,15 +560,10 @@ namespace WindBot.Game.AI.Decks
         {
             if (Duel.Phase == DuelPhase.Main2)
             {
-                IList<ClientCard> tributes = Bot.MonsterZone.GetMatchingCards(card => card.HasAttribute(CardAttribute.Dark) && card.Attack > 2500);
-
-                if (tributes.Count > 0)
+                if (Bot.HasInMonstersZone(CardId.LADY_LABRYNTH))
                 {
-                    if (Card.Location == CardLocation.Hand)
-                    {
-                        AI.SelectPlace(SelectSTPlace(Card, true));
-                        return true;
-                    }
+                    AI.SelectPlace(SelectSTPlace(Card, true));
+                    return true;
                 }
             }
 
@@ -682,7 +728,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool CompulsoryEvacuationDeviceActivate()
         {
-            ClientCard enemyBestMonster = Util.GetBestEnemyMonster();
+            ClientCard enemyBestMonster = Util.GetBestEnemyMonster(true, false);
 
             if (enemyBestMonster != null)
             {
@@ -713,16 +759,21 @@ namespace WindBot.Game.AI.Decks
         public bool WelcomeLabrynthActivate()
         {
             if(Duel.Player == 0 && !(Duel.Phase == DuelPhase.Main1 || Duel.Phase == DuelPhase.Main2))
-                return true;
+                return false;
+
+            // Let Labrynth Labyrinth resolve before activating welcome
+            if (Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH) && Duel.CurrentChain.Count() > 0)
+            {
+                if (Duel.CurrentChain.ContainsCardWithId(CardId.LABRYNTH_LABYRINTH))
+                    return false;
+            }
 
             List<int> preferred_Monsters = new List<int>();
 
             if (!Bot.HasInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH))
                 preferred_Monsters.Add(CardId.LOVELY_LABRYNTH);
-
             if (!Bot.HasInHandOrHasInMonstersZone(CardId.LADY_LABRYNTH))
                 preferred_Monsters.Add(CardId.LADY_LABRYNTH);
-
             if(Bot.HasInHandOrInMonstersZoneOrInGraveyard(CardId.LADY_LABRYNTH) && Bot.HasInMonstersZoneOrInGraveyard(CardId.LOVELY_LABRYNTH) || ArrianaActivated != false)
                 preferred_Monsters.Add(CardId.ARIANNA);
 
@@ -735,7 +786,7 @@ namespace WindBot.Game.AI.Decks
             {
                 if (ActivateDescription == Util.GetStringId(CardId.WELCOME_LABYRINTH, 0))
                 {
-                    ClientCard problemCard = Util.GetBestEnemyCard();
+                    ClientCard problemCard = Util.GetBestEnemyCard(false,true);
 
                     if (problemCard != null && Enemy.GetFieldCount() > 0)
                     {
@@ -816,8 +867,19 @@ namespace WindBot.Game.AI.Decks
 
         public bool FurnitureActivation()
         {
+            if (Util.GetLastChainCard() != null)
+            {
+                if (Util.GetLastChainCard().IsCode(CardId.CHANDRAGLIER)
+                    || Util.GetLastChainCard().IsCode(CardId.STOVIE_TORBIE)
+                    || Util.GetLastChainCard().IsCode(CardId.LABRYNTH_LABYRINTH))
+                    return false;
+            }
+
             if (Card.Location == CardLocation.Hand && Duel.Phase == DuelPhase.Main1 || Duel.Phase == DuelPhase.Main2)
             {
+                if (Bot.Hand.GetCardCount(CardId.WELCOME_LABYRINTH) == 0 && Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                    return false;
+
                 // Look for duplicate copies of the same card or Chandraglier and use them as materials.
                 List<int> cost_candidates = new List<int>();
 
@@ -843,17 +905,19 @@ namespace WindBot.Game.AI.Decks
                     {
                         AI.SelectCard(cost_candidates);
 
-                        int deck_remaining_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
-
                         if (!Bot.HasInSpellZone(CardId.WELCOME_LABYRINTH))
                         {
                             AI.SelectNextCard(CardId.WELCOME_LABYRINTH);
                             AI.SelectPlace(SelectSTPlace(Bot.Deck.GetFirstMatchingCard(card => card.IsCode(CardId.WELCOME_LABYRINTH)), true));
+                            return true;
                         }
                         else if (!Bot.HasInHandOrInSpellZone(CardId.LABRYNTH_LABYRINTH))
+                        {
                             AI.SelectNextCard(CardId.LABRYNTH_LABYRINTH);
+                            return true;
+                        }
 
-                        return true;
+                        return false;
                     }
                 }
             }
