@@ -52,23 +52,25 @@ namespace WindBot.Game.AI.Decks
         : base(ai, duel)
         {
             AddExecutor(ExecutorType.Activate, CardId.DimensionShifter);
-
             AddExecutor(ExecutorType.Activate, CardId.BookOfMoon, BookOfMoonActivate);
             AddExecutor(ExecutorType.Activate, CardId.PotOfDuality, PotOfDualityActivate);
             AddExecutor(ExecutorType.Activate, CardId.PotOfProsperity, PotOfProsperityActivate);
             AddExecutor(ExecutorType.Activate, CardId.HarpiesFeatherDuster, DefaultHarpiesFeatherDusterFirst);
+            AddExecutor(ExecutorType.Activate, CardId.TrippleTacticsTalent, TrippleTacticsTalentActivate);
+
 
             AddExecutor(ExecutorType.Activate, CardId.AdventOfAdventure, AdventOfAdventureEffect);
             AddExecutor(ExecutorType.Activate, CardId.Terraforming, TerraformingActivate);
             AddExecutor(ExecutorType.Activate, CardId.MagnificentMap, MagnificentMapActivate);
             AddExecutor(ExecutorType.Activate, CardId.MagnificentMap, Active_MagnificentMapActivate);
             AddExecutor(ExecutorType.Activate, CardId.UnexploredWinds, UnexploredWindsActivate);
+            AddExecutor(ExecutorType.Activate, CardId.TrippleTacticsThrust, TrippleTacticsThrustActivate);
 
-            AddExecutor(ExecutorType.Activate, CardId.Snowl, SnowlActivate);
-            AddExecutor(ExecutorType.Activate, CardId.Avian, AvianActivate);
-
-
+            // XYZ Summons
+            AddExecutor(ExecutorType.SpSummon, CardId.AssembeledNightingale, AssembeledNightingaleSpSummon);
+            AddExecutor(ExecutorType.SpSummon, CardId.DowneredMagician);
             AddExecutor(ExecutorType.SpSummon, CardId.Fucho, FuchoSpSummon);
+
             AddExecutor(ExecutorType.Activate, CardId.Fucho);
             AddExecutor(ExecutorType.SpSummon, CardId.GustavMax, JuggernautGustavMaxOverlay);
             AddExecutor(ExecutorType.Activate, CardId.GustavMax);
@@ -77,6 +79,12 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.SpSummon, CardId.Zeus);
             AddExecutor(ExecutorType.Activate, CardId.Zeus, ZeusEffect);
 
+            AddExecutor(ExecutorType.Summon, CardId.Snowl, SnowlSummon);
+            AddExecutor(ExecutorType.Summon, CardId.Avian, AvianSummon);
+            AddExecutor(ExecutorType.Summon, CardId.RaizaMegaMonarch, RaizaMegaMonarchSummon);
+
+            AddExecutor(ExecutorType.Activate, CardId.Snowl, SnowlActivate);
+            AddExecutor(ExecutorType.Activate, CardId.Avian, AvianActivate);
 
             AddExecutor(ExecutorType.Summon, CardId.Robina);
             AddExecutor(ExecutorType.Summon, CardId.Eglen, EglenSummon);
@@ -86,13 +94,15 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate, CardId.Robina, RobinaEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, EglenEffect);
             AddExecutor(ExecutorType.Activate, CardId.Toccan, ToccanEffect);
-            AddExecutor(ExecutorType.Activate, CardId.Stri);
+            AddExecutor(ExecutorType.Activate, CardId.Stri, StriEffect);
 
             // Chain block for strongest effect monster
             AddExecutor(ExecutorType.Activate, CardId.Empen, EmpenEffect);
             AddExecutor(ExecutorType.Activate, CardId.Robina, RobinaBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, EglenBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, ToccanBanishedEffect);
+            AddExecutor(ExecutorType.Activate, CardId.Stri, StriBanishedEffect);
+
 
             AddExecutor(ExecutorType.SpellSet, CardId.DreamingTown, DreamingTownSet);
             AddExecutor(ExecutorType.Activate, CardId.DreamingTown);
@@ -100,6 +110,162 @@ namespace WindBot.Game.AI.Decks
 
             AddExecutor(ExecutorType.SpellSet, CardId.HarpiesFeatherStorm);
             AddExecutor(ExecutorType.Activate, CardId.HarpiesFeatherStorm);
+        }
+
+        private bool StriBanishedEffect()
+        {
+            ClientCard robina = Bot.Banished.GetFirstMatchingCard(card => card.IsCode(CardId.Robina));
+
+            if (!(Card.Location == CardLocation.MonsterZone || Card.Location == CardLocation.Grave || Card.Location == CardLocation.Hand))
+                return true;
+
+            return false;
+        }
+
+        private bool StriEffect()
+        {
+            if (Card.Location == CardLocation.MonsterZone)
+            {
+
+                List<int> prefferedCards = new List<int>()
+                {
+                    CardId.UnexploredWinds
+                };
+
+                if (Enemy.Graveyard.GetDangerousMonster() != null)
+                    prefferedCards.Add(Enemy.Graveyard.GetDangerousMonster().Id);
+
+                AI.SelectCard(prefferedCards);
+
+                if (Bot.HasInHand(CardId.Toccan) && Bot.Banished.Count() > 0) AI.SelectCard(CardId.Toccan);
+                else
+                {
+                    AI.SelectCard(Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToList());
+                    AI.SelectThirdCard(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToList());
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TrippleTacticsTalentActivate()
+        {
+            if (Bot.MonsterZone.Count() > 1)
+                AI.SelectOption(1);
+            else if (Util.IsAllEnemyBetter())
+                AI.SelectOption(2);
+            else
+            {
+                AI.SelectOption(3);
+                AI.SelectNextCard(Enemy.Hand.GetDangerousMonster());
+            }
+
+            return true;
+        }
+
+        private bool robina_NormalSummonEffectActivated = false,
+                    eglen_NormalSummonEffectActivated = false,
+                    PotOfProsperityActivated = false;
+
+        private bool TrippleTacticsThrustActivate()
+        {
+            if (Bot.Deck.GetCardCount(CardId.TrippleTacticsTalent) != 0) AI.SelectCard(CardId.TrippleTacticsTalent);
+            else if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Robina) || Bot.HasInBanished(CardId.Robina))) AI.SelectCard(CardId.AdventOfAdventure);
+            else if (!Bot.HasInSpellZone(CardId.MagnificentMap)) AI.SelectCard(CardId.MagnificentMap);
+            else AI.SelectCard(new List<int> { CardId.BookOfMoon, CardId.HarpiesFeatherDuster, CardId.UnexploredWinds });
+
+            return true;
+        }
+
+        //public override bool OnSelectYesNo(long desc)
+        //{
+        //    if (desc == Util.GetStringId(CardId.AssembeledNightingale, 0))
+        //    {
+        //        activate_pre_PressuredPlanetWraitsoth = true;
+        //    }
+        //    return base.OnSelectYesNo(desc);
+        //}
+
+        private bool AssembeledNightingaleSpSummon()
+        {
+            if (Bot.HasInMonstersZone(CardId.AssembeledNightingale) || Bot.HasInMonstersZone(CardId.Zeus)) return false;
+
+            AI.SelectPlace(Zones.ExtraMonsterZones);
+            AI.SelectPosition(CardPosition.Attack);
+
+            // Direct Attack
+            if (Duel.Player == 0 && Duel.Phase == DuelPhase.BattleStart)
+                AI.SelectYesNo(true);
+
+            return true;
+        }
+
+        private bool RaizaMegaMonarchSummon()
+        {
+            if (ActivateDescription == Util.GetStringId(CardId.RaizaMegaMonarch,0) && Util.IsAllEnemyBetter() && Enemy.GetFieldCount() > 1)
+            {
+                // Target 1 card on the field
+                AI.SelectCard(Util.GetBestEnemyCard(false, true));
+
+                // Target card on bot's graveyard
+                List<int> prefferedCards = Bot.Graveyard.Select(c => c.Id).ToList();
+                AI.SelectNextCard(prefferedCards);
+
+                // Target another card if it's tributted with Winged monster
+                if (prefferedCards.Count() > 0)
+                {
+                    AI.OnSelectYesNo(1);
+                    AI.SelectNextCard(prefferedCards);
+                }
+                else AI.OnSelectYesNo(0);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool AvianSummon()
+        {
+            return UnexploredWindsTribute();
+        }
+
+        private bool SnowlSummon()
+        {
+            return UnexploredWindsTribute();
+        }
+
+        public override int OnSelectOption(IList<long> options)
+        {
+            // Unexplored Winds Option
+            if (options.Count == 2 && options[1] == Util.GetStringId(CardId.UnexploredWinds, 0))
+                return 2;
+            return base.OnSelectOption(options);
+        }
+
+
+        private bool UnexploredWindsTribute()
+        {
+            ClientCard enemyCard = Util.GetBestEnemyCard();
+            ClientCard myMonster = Util.GetWorstBotMonster(true);
+
+            if (Bot.HasInSpellZone(CardId.UnexploredWinds) && enemyCard != null)
+            {
+                List<int> materials = new List<int>
+                {
+                    enemyCard.Id,
+                    myMonster.Id
+                };
+
+                // tribute summon using opponent's cards
+                AI.SelectMaterials(materials);
+
+                return true;
+            }
+
+            return false;
         }
 
         private bool ToccanSummon()
@@ -110,15 +276,10 @@ namespace WindBot.Game.AI.Decks
         private bool UnexploredWindsActivate()
         {
             if (Card.Location == CardLocation.Hand)
-            {
-                List<ClientCard> hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 6).ToList();
-
-                if (hand_bossMonsters.Count() > 0)
-                    return true;
-            }
+                return true;
             else if (Card.Location == CardLocation.SpellZone)
             {
-                if(!Bot.Hand.ContainsMonsterWithLevel(1))
+                if (!Bot.Hand.ContainsMonsterWithLevel(1))
                     return true;
             }
 
@@ -169,6 +330,8 @@ namespace WindBot.Game.AI.Decks
             }
 
             AI.SelectCard(cardsId);
+
+            PotOfProsperityActivated = true;
             return true;
         }
 
@@ -207,7 +370,7 @@ namespace WindBot.Game.AI.Decks
         {
             ClientCard enemy_bestCard = Util.GetBestEnemyCard(true, true);
 
-            if (enemy_bestCard != null)
+            if (enemy_bestCard != null && Util.IsAllEnemyBetter())
                 return true;
 
             return false;
@@ -222,6 +385,9 @@ namespace WindBot.Game.AI.Decks
 
         private bool BookOfMoonActivate()
         {
+            if (!(Duel.Player == 0)) return false;
+            if(!(Util.IsChainTarget(Card) && Duel.CurrentChain.Contains(Card) && Duel.LastChainPlayer == 1)) return false;
+
             ClientCard enemy_bestCard = Util.GetBestEnemyMonster(true, true);
 
             if (enemy_bestCard != null) {
@@ -234,6 +400,8 @@ namespace WindBot.Game.AI.Decks
 
         private bool FuchoSpSummon()
         {
+            if (Bot.HasInExtra(CardId.AssembeledNightingale)) return false;
+
             AI.SelectPlace(Zones.ExtraMonsterZones);
             AI.SelectPosition(CardPosition.Attack);
             return !Bot.HasInMonstersZone(CardId.Fucho);
@@ -245,12 +413,12 @@ namespace WindBot.Game.AI.Decks
             return true;
         }
 
-        private bool robina_NormalSummonEffectActivated = false,
-                    eglen_NormalSummonEffectActivated = false;
+        
         public override void OnNewTurn()
         {
             robina_NormalSummonEffectActivated = false;
             eglen_NormalSummonEffectActivated = false;
+            PotOfProsperityActivated = false;
 
             base.OnNewTurn();
         }
@@ -314,7 +482,7 @@ namespace WindBot.Game.AI.Decks
                 {
                     AI.SelectCard(reveal);
 
-                    if (!Bot.HasInHandOrInGraveyard(CardId.Toccan) || !Bot.HasInBanished(CardId.Toccan))
+                    if (!(Bot.HasInHandOrInGraveyard(CardId.Toccan) || Bot.HasInBanished(CardId.Toccan)))
                         AI.SelectCard(CardId.Toccan);
                     else AI.SelectNextCard(reveal);
                 }
@@ -367,7 +535,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool DreamingTownSet()
         {
-            return Bot.HasInHandOrHasInMonstersZone(CardId.Robina) || Bot.HasInBanished(CardId.Robina);
+            return Bot.HasInHandOrHasInMonstersZone(CardId.Robina) || Bot.HasInBanished(CardId.Robina) || Bot.HasInHandOrHasInMonstersZone(CardId.Eglen) || Bot.HasInBanished(CardId.Eglen);
         }
 
         private bool PotOfDualityActivate()
@@ -431,7 +599,7 @@ namespace WindBot.Game.AI.Decks
         {
             if (Card.Location == CardLocation.MonsterZone)
             {
-                if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Eglen) || Bot.HasInBanished(CardId.Eglen)))
+                if (!Bot.HasInHand(CardId.Eglen) && !eglen_NormalSummonEffectActivated)
                 {
                     AI.SelectCard(CardId.Eglen);
                     AI.SelectNextCard(CardId.Eglen);
@@ -447,15 +615,20 @@ namespace WindBot.Game.AI.Decks
                         CardId.Robina
                     };
 
-                    if (Bot.HasInHand(CardId.Eglen))
+                    int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToArray();
+
+                    if (hand_bossMonsters.Count() > 0)
                     {
-                        AI.SelectCard(CardId.Eglen);
+                        AI.SelectCard(hand_bossMonsters);
+                        AI.SelectMaterials(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray());
                     }
                     else
                     {
                         AI.SelectCard(otherPrefferedCards);
                         AI.SelectNextCard(otherPrefferedCards);
                     }
+
+                    
 
                     robina_NormalSummonEffectActivated = true;
 
