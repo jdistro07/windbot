@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using System.Threading;
+using System.Configuration;
+using YGOSharp.OCGWrapper;
 
 namespace WindBot.Game.AI.Decks
 {
@@ -62,6 +64,9 @@ namespace WindBot.Game.AI.Decks
 
         // battle phase Actions
         private bool SlackerMagicianAttacks = false;
+
+        //xyz activations
+        private bool ZeusActivated = false;
 
         public FloowandereezeExecutor(GameAI ai, Duel duel)
         : base(ai, duel)
@@ -125,6 +130,24 @@ namespace WindBot.Game.AI.Decks
 
         public override BattlePhaseAction OnBattle(IList<ClientCard> attackers, IList<ClientCard> defenders)
         {
+            foreach (ClientCard card in attackers)
+            {
+                if (card.IsCode(CardId.Empen))
+                {
+                    ClientCard empenTarget = defenders.GetHighestAttackMonster();
+                    if (empenTarget != null && OnPreBattleBetween(card, empenTarget))
+                        return AI.Attack(card, empenTarget);
+
+                }
+                else if (card.IsCode(CardId.SlackerdMagician))
+                {
+                    ClientCard slackerTarget = defenders.GetLowestAttackMonster();
+
+                    if (slackerTarget != null && OnPreBattleBetween(card,slackerTarget))
+                        return AI.Attack(card, slackerTarget);
+                }
+            }
+
             return base.OnBattle(attackers, defenders);
         }
 
@@ -132,10 +155,18 @@ namespace WindBot.Game.AI.Decks
         {
             if (attacker.IsCode(CardId.Empen) && defender.RealPower > attacker.RealPower)
             {
-                ActivateempenBattleEffect = true;
+                if (defender.RealPower > attacker.RealPower) ActivateempenBattleEffect = true;
+                else ActivateempenBattleEffect = false;
+
                 return defender.RealPower / 2 < attacker.RealPower && Bot.Hand.Count() > 0;
             }
-                
+
+            if (attacker.IsCode(CardId.SlackerdMagician) && defender.RealPower > attacker.RealPower)
+            {
+                int potentialSelfDamage = defender.RealPower - attacker.RealPower;
+                SlackerMagicianAttacks = Bot.LifePoints > potentialSelfDamage ? true : false;
+                return Bot.LifePoints > potentialSelfDamage;
+            }
 
             return base.OnPreBattleBetween(attacker, defender);
         }
@@ -451,7 +482,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool ZeusEffect()
         {
-            if (Duel.CurrentChain.Contains(Card)) return false; // do not chain to self
+            if (ZeusActivated && Duel.Player == 0) return false;
 
             ClientCard enemy_bestCard = Util.GetBestEnemyCard();
 
@@ -513,6 +544,9 @@ namespace WindBot.Game.AI.Decks
 
             // Battle phase actions
             SlackerMagicianAttacks = false;
+
+            // XYZ Activation
+            ZeusActivated = false;
 
             base.OnNewTurn();
         }
