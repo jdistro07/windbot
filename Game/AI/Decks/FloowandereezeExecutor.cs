@@ -137,7 +137,6 @@ namespace WindBot.Game.AI.Decks
                     ClientCard empenTarget = defenders.GetHighestAttackMonster();
                     if (empenTarget != null && OnPreBattleBetween(card, empenTarget))
                         return AI.Attack(card, empenTarget);
-
                 }
                 else if (card.IsCode(CardId.SlackerdMagician))
                 {
@@ -156,7 +155,7 @@ namespace WindBot.Game.AI.Decks
             if (attacker.IsCode(CardId.Empen) && defender.RealPower > attacker.RealPower)
             {
                 if (defender.RealPower > attacker.RealPower) ActivateempenBattleEffect = true;
-                else ActivateempenBattleEffect = false;
+                else if (defender.RealPower <= attacker.RealPower) ActivateempenBattleEffect = false;
 
                 return defender.RealPower / 2 < attacker.RealPower && Bot.Hand.Count() > 0;
             }
@@ -173,21 +172,26 @@ namespace WindBot.Game.AI.Decks
 
         private bool EmpenBattleEffect()
         {
-            // prioritize theres cards as cost (Do not discard Unexplored Winds and Dreaming Town if you can)
-            List<int> cost = new List<int>();
-
-            if (Bot.Hand.Count() > 2)
+            if (Duel.Phase == DuelPhase.Battle)
             {
-                cost = Bot.Hand.GetMatchingCards(card => !(card.IsCode(CardId.UnexploredWinds)) || card.IsCode(CardId.DreamingTown))
-                            .Select(c => c.Id)
-                            .ToList();
+                // prioritize theres cards as cost (Do not discard Unexplored Winds and Dreaming Town if you can)
+                List<int> cost = new List<int>();
+
+                if (Bot.Hand.Count() > 2)
+                {
+                    cost = Bot.Hand.GetMatchingCards(card => !(card.IsCode(CardId.UnexploredWinds)) || card.IsCode(CardId.DreamingTown))
+                                .Select(c => c.Id)
+                                .ToList();
+                }
+                else // prioritize saving Empen and consider every card on hand as a cost
+                    cost = Bot.Hand.Select(c => c.Id).ToList();
+
+                AI.SelectCard(cost);
+
+                return cost.Count() > 0 && ActivateempenBattleEffect;
             }
-            else // prioritize saving Empen and consider every card on hand as a cost
-                cost = Bot.Hand.Select(c => c.Id).ToList();
 
-            AI.SelectCard(cost);
-
-            return Duel.Phase == DuelPhase.Battle && Bot.Hand.Count() > 0 && ActivateempenBattleEffect;
+            return false;
         }
 
         private bool ZeusSpSummon()
@@ -200,6 +204,9 @@ namespace WindBot.Game.AI.Decks
 
         private bool DreamingTownActivate()
         {
+            if (Bot.HasInHand(CardId.Robina) && !robina_NormalSummonEffectActivated)
+                AI.SelectCard(CardId.Robina);
+
             return Card.Location == CardLocation.SpellZone
                     && Duel.Player == 1
                     && Bot.Hand.ContainsMonsterWithLevel(1);
@@ -486,8 +493,13 @@ namespace WindBot.Game.AI.Decks
 
             ClientCard enemy_bestCard = Util.GetBestEnemyCard();
 
-            if (enemy_bestCard != null && Util.IsAllEnemyBetter(true))
+            if (enemy_bestCard != null)
+            {
+                if (Duel.Player == 1 && enemy_bestCard.Attack > Card.Attack)
+                    return true;
+
                 return true;
+            }
 
             return false;
         }
@@ -554,8 +566,7 @@ namespace WindBot.Game.AI.Decks
         private bool DreamingTownGraveyardActivate()
         {
             return Card.Location == CardLocation.Grave
-                    && Util.IsAllEnemyBetter()
-                    && (Duel.Phase == DuelPhase.Battle)
+                    && Util.IsAllEnemyBetter(true)
                     && Duel.Player == 1;
         }
 
@@ -740,6 +751,8 @@ namespace WindBot.Game.AI.Decks
                     AI.SelectCard(CardId.Eglen);
                     AI.SelectNextCard(CardId.Eglen);
 
+                    robina_NormalSummonEffectActivated = true;
+
                     return true;
                 }
                 else
@@ -870,8 +883,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool Empen_NormalSummonAgain()
         {
-            return Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 1
-                || !robina_NormalSummonEffectActivated && Bot.HasInHand(CardId.Robina)
+            return !robina_NormalSummonEffectActivated && Bot.HasInHand(CardId.Robina)
                 || !eglen_NormalSummonEffectActivated && Bot.HasInHand(CardId.Eglen)
                 || !stri_NormalSummonEffectActivated && Bot.HasInHand(CardId.Stri)
                 || !toccan_NormalSummonEffectActivated && Bot.HasInHand(CardId.Toccan);
@@ -886,11 +898,6 @@ namespace WindBot.Game.AI.Decks
                 materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1)
                                 .Select(x => x.Id)
                                 .ToList();
-
-                int[] prefferedCards = new int[]
-                {
-                    CardId.Snowl
-                };
 
                 if (!Bot.HasInHandOrHasInMonstersZone(CardId.Empen)
                     || Bot.MonsterZone.GetCardCount(CardId.Empen) > 0 && Duel.Player == 1)
@@ -911,20 +918,27 @@ namespace WindBot.Game.AI.Decks
                     // Summon empen
                     AI.SelectNextCard(CardId.Empen);
                     AI.SelectMaterials(materials);
+
+                    eglen_NormalSummonEffectActivated = true;
+
                     return true;
                 }
                 else
                 {
-                    if (!Bot.HasInHand(CardId.Avian))
+                    if (!Bot.HasInHand(CardId.Avian) && Duel.Player == 1)
                     {
-                        AI.SelectCard(CardId.Avian);
+                        if (!Bot.HasInHand(CardId.Empen)) AI.SelectCard(CardId.Empen);
+                        else AI.SelectCard(CardId.Avian);
 
+                        // Normal summon next monster
                         if (Bot.HasInHand(CardId.Empen)) AI.SelectNextCard(CardId.Empen);
                         else AI.SelectNextCard(CardId.Avian);
 
-                        if (Bot.HasInSpellZone(CardId.UnexploredWinds) && Util.GetBestEnemyCard() != null)
+                        if (Bot.HasInSpellZone(CardId.UnexploredWinds) && Util.GetBestEnemyCard() != null && Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 0)
                         {
                             AI.SelectOption(2);
+                            materials.Clear();
+                            materials.Add(Bot.MonsterZone.GetFirstMatchingCard(card => card.Level == 1).Id);
                             materials.Add(Util.GetBestEnemyCard().Id);
                         }
 
@@ -937,9 +951,6 @@ namespace WindBot.Game.AI.Decks
                             AI.SelectOption(2);
                             materials.Add(Util.GetBestEnemyCard().Id);
                         }
-
-                        AI.SelectCard(prefferedCards);
-                        AI.SelectMaterials(materials);
                     }
 
                     eglen_NormalSummonEffectActivated = true;
