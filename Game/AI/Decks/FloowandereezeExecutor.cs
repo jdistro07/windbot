@@ -155,7 +155,7 @@ namespace WindBot.Game.AI.Decks
             if (attacker.IsCode(CardId.Empen) && defender.RealPower > attacker.RealPower)
             {
                 if (defender.RealPower > attacker.RealPower) ActivateempenBattleEffect = true;
-                else if (defender.RealPower <= attacker.RealPower) ActivateempenBattleEffect = false;
+                else ActivateempenBattleEffect = false;
 
                 return defender.RealPower / 2 < attacker.RealPower && Bot.Hand.Count() > 0;
             }
