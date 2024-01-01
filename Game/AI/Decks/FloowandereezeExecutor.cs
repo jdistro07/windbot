@@ -813,69 +813,32 @@ namespace WindBot.Game.AI.Decks
                 });
 
                 if (!(Bot.HasInHandOrInSpellZoneOrInGraveyard(CardId.DreamingTown) || Bot.HasInBanished(CardId.DreamingTown)))
-                {
                     AI.SelectCard(CardId.DreamingTown);
+                else AI.SelectCard(other_prefferedCards);
 
-                    // decided whether to normal summon or not
-                    bool decision = Empen_NormalSummonAgain();
+                bool decision = Empen_NormalSummonAgain();
 
-                    AI.SelectYesNo(decision);
+                if (decision)
+                {
+                    AI.SelectYesNo(true);
 
-                    //SP summon boss monsters
-                    if (decision && Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 1)
-                    {
-                        List<int> prefferedMonster = new List<int>();
-                        int[] materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
+                    List<int> prefferedMonster = new List<int>();
+                    int[] materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
 
-                        if (Bot.HasInHand(CardId.Avian)) prefferedMonster.Add(CardId.Avian);
-                        else if (Bot.HasInHand(CardId.Snowl)) prefferedMonster.Add(CardId.Snowl);
-                        else
-                            prefferedMonster.AddRange(new List<int> {
+                    if (Bot.HasInHand(CardId.Empen)) prefferedMonster.Add(CardId.Empen);
+                    else if (Bot.HasInHand(CardId.Snowl)) prefferedMonster.Add(CardId.Snowl);
+                    else if (Bot.HasInHand(CardId.Avian)) prefferedMonster.Add(CardId.Avian);
+                    else
+                        prefferedMonster.AddRange(new List<int> {
                             CardId.RaizaMegaMonarch
                         });
 
-                        AI.SelectNextCard(prefferedMonster);
-                    }
-                    else
-                    {
-                        int[] hand_Level1_Monsters = Bot.Hand.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
-
-                        if (Bot.HasInHand(CardId.Stri)
-                            && (
-                                Bot.HasInGraveyard(CardId.Empen)
-                                || Bot.HasInGraveyard(CardId.Snowl)
-                                || Bot.HasInGraveyard(CardId.Avian)
-                                || Bot.HasInGraveyard(CardId.RaizaMegaMonarch)
-                                || Bot.HasInBanished(CardId.UnexploredWinds)
-                                || Bot.HasInBanished(CardId.DreamingTown)
-                            ))
-                        {
-                            AI.SelectNextCard(CardId.Stri);
-                        }
-                        else if (
-                            Bot.HasInHand(CardId.Stri)
-                            && (
-                                Bot.HasInBanished(CardId.Empen)
-                                || Bot.HasInBanished(CardId.Snowl)
-                                || Bot.HasInBanished(CardId.Avian)
-                                || Bot.HasInBanished(CardId.RaizaMegaMonarch)
-                                || Bot.HasInBanished(CardId.UnexploredWinds)
-                                || Bot.HasInBanished(CardId.DreamingTown)
-                               ))
-                        {
-                            AI.SelectNextCard(CardId.Toccan);
-                        }
-
-                        else AI.SelectNextCard(CardId.Robina);
-                    }
-
-                    return true;
+                    AI.SelectNextCard(prefferedMonster);
+                    AI.SelectMaterials(materials);
                 }
-                else
-                {
-                    AI.SelectCard(other_prefferedCards);
-                    return true;
-                }
+                else AI.SelectYesNo(false);
+
+                return true;
             }
 
             return false;
@@ -883,11 +846,8 @@ namespace WindBot.Game.AI.Decks
 
         private bool Empen_NormalSummonAgain()
         {
-            return !robina_NormalSummonEffectActivated && Bot.HasInHand(CardId.Robina)
-                || !eglen_NormalSummonEffectActivated && Bot.HasInHand(CardId.Eglen)
-                || !stri_NormalSummonEffectActivated && Bot.HasInHand(CardId.Stri)
-                || !toccan_NormalSummonEffectActivated && Bot.HasInHand(CardId.Toccan);
-
+            return (Bot.Hand.ContainsMonsterWithLevel(8) || Bot.Hand.ContainsMonsterWithLevel(7))
+                    && Bot.MonsterZone.GetMatchingCardsCount(card => card.Level == 1) > 1;
         }
 
         private bool EglenEffect()
