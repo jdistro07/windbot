@@ -5,6 +5,8 @@ using System;
 using System.Threading;
 using System.Configuration;
 using YGOSharp.OCGWrapper;
+using YGOSharp.Network.Enums;
+using WindBot.Game.AI.Enums;
 
 namespace WindBot.Game.AI.Decks
 {
@@ -95,6 +97,11 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate, CardId.AdventOfAdventure, AdventOfAdventureEffect);
             AddExecutor(ExecutorType.Activate, CardId.UnexploredWinds, UnexploredWindsActivate);
             AddExecutor(ExecutorType.SpellSet, CardId.DreamingTown, DreamingTownSet);
+            AddExecutor(ExecutorType.Activate, CardId.DreamingTown, DreamingTownActivate);
+            AddExecutor(ExecutorType.Activate, CardId.DreamingTown, DreamingTownGraveyardActivate);
+
+            AddExecutor(ExecutorType.SpellSet, CardId.HarpiesFeatherStorm);
+            AddExecutor(ExecutorType.Activate, CardId.HarpiesFeatherStorm, HarpiesFeatherStormActivate);
 
             AddExecutor(ExecutorType.Summon, CardId.Snowl, SnowlSummon);
             AddExecutor(ExecutorType.Summon, CardId.Avian, AvianSummon);
@@ -115,17 +122,16 @@ namespace WindBot.Game.AI.Decks
 
             // Chain block for strongest effect monster
             AddExecutor(ExecutorType.Activate, CardId.Empen, EmpenEffect);
-            AddExecutor(ExecutorType.Activate, CardId.Empen, EmpenBattleEffect);
 
             AddExecutor(ExecutorType.Activate, CardId.Robina, RobinaBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, EglenBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, ToccanBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Stri, StriBanishedEffect);
-            AddExecutor(ExecutorType.Activate, CardId.DreamingTown, DreamingTownActivate);
-            AddExecutor(ExecutorType.Activate, CardId.DreamingTown, DreamingTownGraveyardActivate);
+        }
 
-            AddExecutor(ExecutorType.SpellSet, CardId.HarpiesFeatherStorm);
-            AddExecutor(ExecutorType.Activate, CardId.HarpiesFeatherStorm);
+        private bool HarpiesFeatherStormActivate()
+        {
+            return Duel.Player == 1; // activate only on opponent's turn
         }
 
         public override BattlePhaseAction OnBattle(IList<ClientCard> attackers, IList<ClientCard> defenders)
@@ -154,11 +160,12 @@ namespace WindBot.Game.AI.Decks
         {
             if (attacker.IsCode(CardId.Empen) && defender.RealPower > attacker.RealPower)
             {
-                if (defender.RealPower > attacker.RealPower) ActivateempenBattleEffect = true;
-                else ActivateempenBattleEffect = false;
+                int empenPower = attacker.Attack + defender.RealPower;
+                int target_preEffectPower = (defender.Attack + defender.RealPower) / 2;
 
-                return defender.RealPower / 2 < attacker.RealPower && Bot.Hand.Count() > 0;
+                return (target_preEffectPower < empenPower) && Bot.Hand.Count() > 0;
             }
+                
 
             if (attacker.IsCode(CardId.SlackerdMagician) && defender.RealPower > attacker.RealPower)
             {
@@ -168,30 +175,6 @@ namespace WindBot.Game.AI.Decks
             }
 
             return base.OnPreBattleBetween(attacker, defender);
-        }
-
-        private bool EmpenBattleEffect()
-        {
-            if (Duel.Phase == DuelPhase.Battle)
-            {
-                // prioritize theres cards as cost (Do not discard Unexplored Winds and Dreaming Town if you can)
-                List<int> cost = new List<int>();
-
-                if (Bot.Hand.Count() > 2)
-                {
-                    cost = Bot.Hand.GetMatchingCards(card => !(card.IsCode(CardId.UnexploredWinds)) || card.IsCode(CardId.DreamingTown))
-                                .Select(c => c.Id)
-                                .ToList();
-                }
-                else // prioritize saving Empen and consider every card on hand as a cost
-                    cost = Bot.Hand.Select(c => c.Id).ToList();
-
-                AI.SelectCard(cost);
-
-                return cost.Count() > 0 && ActivateempenBattleEffect;
-            }
-
-            return false;
         }
 
         private bool ZeusSpSummon()
@@ -491,6 +474,8 @@ namespace WindBot.Game.AI.Decks
         {
             if (ZeusActivated && Duel.Player == 0) return false;
 
+            ZeusActivated = true;
+
             ClientCard enemy_bestCard = Util.GetBestEnemyCard();
 
             if (enemy_bestCard != null)
@@ -621,14 +606,17 @@ namespace WindBot.Game.AI.Decks
                     AI.SelectCard(reveal);
                     AI.SelectNextCard(CardId.Robina);
                 }
-                else
-                {
-                    AI.SelectCard(CardId.Robina);
 
-                    if (!(Bot.HasInHandOrInGraveyard(CardId.Toccan) || Bot.HasInBanished(CardId.Toccan)))
-                        AI.SelectCard(CardId.Toccan);
-                    else AI.SelectNextCard(reveal);
-                }
+                return true;
+            }
+            else if (Card.Location == CardLocation.SpellZone && Bot.HasInHandOrHasInMonstersZone(CardId.Robina))
+            {
+                // reveal robina
+                AI.SelectCard(CardId.Robina);
+
+                if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Toccan) || Bot.HasInBanished(CardId.Toccan)))
+                    AI.SelectCard(CardId.Toccan);
+                else AI.SelectNextCard(CardId.Stri);
 
                 return true;
             }
@@ -757,40 +745,69 @@ namespace WindBot.Game.AI.Decks
                 }
                 else
                 {
-                    int[] otherPrefferedCards = new int[]
+                    if (eglen_NormalSummonEffectActivated)
                     {
-                        CardId.Stri,
-                        CardId.Toccan,
-                        CardId.Robina,
-                        CardId.Eglen
-                    };
+                        int[] otherPrefferedCards = new int[]
+                        {
+                            CardId.Stri,
+                            CardId.Toccan,
+                            CardId.Robina,
+                            CardId.Eglen
+                        };
 
-                    int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToArray();
-                    int[] materials = Bot.Hand.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
+                        int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToArray();
+                        int[] materials = Bot.Hand.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
 
-                    // summon boss monsters
-                    if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
-                    {
-                        AI.SelectCard(hand_bossMonsters);
-                        AI.SelectMaterials(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray());
-                    }
+                        // summon boss monsters
+                        if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
+                        {
+                            AI.SelectCard(hand_bossMonsters);
+                            AI.SelectMaterials(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray());
+                        }
 
-                    if (Bot.Deck.GetCardCount(CardId.Toccan) > 0 && Bot.Banished.Count() > 0)
-                    {
-                        AI.SelectCard(CardId.Toccan);
-                        AI.SelectNextCard(CardId.Toccan);
-                    }
-                    else if (Bot.Deck.GetCardCount(CardId.Stri) > 0 && Bot.Graveyard.Count() > 0)
-                    {
-                        AI.SelectCard(CardId.Toccan);
-                        AI.SelectNextCard(CardId.Toccan);
+                        if (Bot.Deck.GetCardCount(CardId.Toccan) > 0 && Bot.Banished.Count() > 0)
+                        {
+                            AI.SelectCard(CardId.Toccan);
+                            AI.SelectNextCard(CardId.Toccan);
+                        }
+                        else if (Bot.Deck.GetCardCount(CardId.Stri) > 0 && Bot.Graveyard.Count() > 0)
+                        {
+                            AI.SelectCard(CardId.Toccan);
+                            AI.SelectNextCard(CardId.Toccan);
+                        }
+                        else
+                        {
+                            AI.SelectCard(otherPrefferedCards);
+                            if (!eglen_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Eglen);
+                            else if (!stri_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Stri);
+                            else if (!toccan_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Toccan);
+                        }
+
+                        return true;
                     }
                     else
                     {
-                        AI.SelectCard(otherPrefferedCards);
-                        if (!eglen_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Eglen);
-                        else if(!stri_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Stri);
-                        else if(!toccan_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Toccan);
+                        List<int> materials = new List<int>();
+                        materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1)
+                                        .Select(x => x.Id)
+                                        .ToList();
+
+                        // Tribute opponent's card using Unexplored winds
+                        if (Bot.HasInSpellZone(CardId.UnexploredWinds) && Util.GetBestEnemyCard() != null && Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 0)
+                        {
+                            AI.SelectOption(1);
+
+                            materials.Clear();
+                            materials.Add(Bot.MonsterZone.GetFirstMatchingCard(card => card.Level == 1).Id);
+                            materials.Add(Util.GetBestEnemyCard().Id);
+                        }
+
+                        // Summon empen
+                        if(Bot.HasInHand(CardId.Empen)) AI.SelectNextCard(CardId.Empen);
+                        else if(Bot.HasInHand(CardId.Avian)) AI.SelectNextCard(CardId.Empen);
+                        else if (Bot.HasInHand(CardId.Snowl)) AI.SelectNextCard(CardId.Snowl);
+
+                        AI.SelectMaterials(materials);
                     }
 
                     robina_NormalSummonEffectActivated = true;
@@ -804,7 +821,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool EmpenEffect()
         {
-            if (Duel.Phase != DuelPhase.Battle)
+            if (Duel.Phase == DuelPhase.Main1 || Duel.Phase == DuelPhase.Main2)
             {
                 List<int> other_prefferedCards = new List<int>();
 
@@ -839,6 +856,36 @@ namespace WindBot.Game.AI.Decks
                 else AI.SelectYesNo(false);
 
                 return true;
+            }
+            else
+            {
+                if (ActivateDescription == Util.GetStringId(CardId.Empen, 1))
+                {
+                    ClientCard BestMonster = Util.GetBestEnemyMonster();
+
+                    if (BestMonster != null)
+                    {
+                        // prioritize theres cards as cost (Do not discard Unexplored Winds and Dreaming Town if you can)
+                        List<int> cost = new List<int>();
+
+                        if (Bot.Hand.Count() > 2)
+                        {
+                            cost = Bot.Hand.GetMatchingCards(card => !(card.IsCode(CardId.UnexploredWinds)) || card.IsCode(CardId.DreamingTown))
+                                        .Select(c => c.Id)
+                                        .ToList();
+                        }
+                        else cost = Bot.Hand.Select(c => c.Id).ToList();
+
+                        int strongestMonsterAttack = BestMonster.Attack + BestMonster.RealPower;
+                        int empenPower = Card.Attack + Card.RealPower;
+
+                        if (cost.Count() > 0 && strongestMonsterAttack >= empenPower)
+                        {
+                            AI.SelectCard(cost);
+                            return true;
+                        }
+                    }
+                }
             }
 
             return false;
