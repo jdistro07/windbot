@@ -92,6 +92,11 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.SpSummon, CardId.Zeus, ZeusSpSummon);
             AddExecutor(ExecutorType.Activate, CardId.Zeus, ZeusEffect);
 
+            AddExecutor(ExecutorType.Summon, CardId.Snowl, SnowlSummon);
+            AddExecutor(ExecutorType.Summon, CardId.Avian, AvianSummon);
+            AddExecutor(ExecutorType.Summon, CardId.Empen, EmpenSummon);
+            AddExecutor(ExecutorType.Summon, CardId.RaizaMegaMonarch, RaizaMegaMonarchSummon);
+
             AddExecutor(ExecutorType.Activate, CardId.MagnificentMap, MagnificentMapActivate);
             AddExecutor(ExecutorType.Activate, CardId.MagnificentMap, Active_MagnificentMapActivate);
             AddExecutor(ExecutorType.Activate, CardId.AdventOfAdventure, AdventOfAdventureEffect);
@@ -103,17 +108,11 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.SpellSet, CardId.HarpiesFeatherStorm);
             AddExecutor(ExecutorType.Activate, CardId.HarpiesFeatherStorm, HarpiesFeatherStormActivate);
 
-            AddExecutor(ExecutorType.Summon, CardId.Snowl, SnowlSummon);
-            AddExecutor(ExecutorType.Summon, CardId.Avian, AvianSummon);
-            AddExecutor(ExecutorType.Summon, CardId.RaizaMegaMonarch, RaizaMegaMonarchSummon);
-
             AddExecutor(ExecutorType.Activate, CardId.Snowl, SnowlActivate);
             AddExecutor(ExecutorType.Activate, CardId.Avian, AvianActivate);
 
-            AddExecutor(ExecutorType.Summon, CardId.Robina);
+            AddExecutor(ExecutorType.Summon, CardId.Robina, NormalSummonRobina);
             AddExecutor(ExecutorType.Summon, CardId.Eglen, EglenSummon);
-            AddExecutor(ExecutorType.Summon, CardId.Toccan, ToccanSummon);
-
 
             AddExecutor(ExecutorType.Activate, CardId.Robina, RobinaEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, EglenEffect);
@@ -127,6 +126,22 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Activate, CardId.Eglen, EglenBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Eglen, ToccanBanishedEffect);
             AddExecutor(ExecutorType.Activate, CardId.Stri, StriBanishedEffect);
+        }
+
+        private bool EmpenSummon()
+        {
+            return UnexploredWindsTribute();
+        }
+
+        // Prefer always first if RPS is won
+        public override bool OnSelectHand()
+        {
+            return true;
+        }
+
+        private bool NormalSummonRobina()
+        {
+            return !robina_NormalSummonEffectActivated;
         }
 
         private bool HarpiesFeatherStormActivate()
@@ -169,7 +184,7 @@ namespace WindBot.Game.AI.Decks
 
             if (attacker.IsCode(CardId.SlackerdMagician) && defender.RealPower > attacker.RealPower)
             {
-                int potentialSelfDamage = defender.RealPower - attacker.RealPower;
+                int potentialSelfDamage = (defender.Attack + defender.RealPower) - (attacker.Attack + attacker.RealPower);
                 SlackerMagicianAttacks = Bot.LifePoints > potentialSelfDamage ? true : false;
                 return Bot.LifePoints > potentialSelfDamage;
             }
@@ -222,17 +237,47 @@ namespace WindBot.Game.AI.Decks
                 {
                     CardId.UnexploredWinds,
                     CardId.AdventOfAdventure,
-                    CardId.MagnificentMap
+                    CardId.MagnificentMap,
+                    CardId.Robina,
+                    CardId.Eglen,
+                    CardId.Empen,
+                    CardId.Avian,
+                    CardId.Snowl,
+                    CardId.Toccan
                 };
 
                 AI.SelectCard(prefferedCards);
 
-                if (Bot.HasInHand(CardId.Toccan) && Bot.Banished.Count() > 0) AI.SelectCard(CardId.Toccan);
-                else
+                int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 7).Select(c => c.Id).ToArray();
+
+                List<int> materials = new List<int>();
+                materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1)
+                                .Select(x => x.Id)
+                                .ToList();
+
+                // Tribute opponent's card using Unexplored winds
+                if (Bot.HasInSpellZone(CardId.UnexploredWinds) && Util.GetBestEnemyCard() != null && Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 0)
                 {
-                    AI.SelectCard(Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToList());
-                    AI.SelectThirdCard(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToList());
+                    AI.SelectOption(1);
+
+                    materials.Clear();
+                    materials.Add(Bot.MonsterZone.GetFirstMatchingCard(card => card.Level == 1).Id);
+                    materials.Add(Util.GetBestEnemyCard().Id);
                 }
+
+                // summon boss monsters
+                if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
+                {
+                    AI.SelectYesNo(true);
+
+                    // Summon empen
+                    if (Bot.HasInHand(CardId.Empen)) AI.SelectNextCard(CardId.Empen);
+                    else if (Bot.HasInHand(CardId.Avian)) AI.SelectNextCard(CardId.Avian);
+                    else if (Bot.HasInHand(CardId.Snowl)) AI.SelectNextCard(CardId.Snowl);
+
+                    AI.SelectMaterials(materials);
+                }
+                else AI.SelectYesNo(false);
 
                 stri_NormalSummonEffectActivated = true;
 
@@ -333,11 +378,6 @@ namespace WindBot.Game.AI.Decks
             return false;
         }
 
-        private bool ToccanSummon()
-        {
-            return !(eglen_NormalSummonEffectActivated || robina_NormalSummonEffectActivated);
-        }
-
         private bool UnexploredWindsActivate()
         {
             if (Card.Location == CardLocation.Hand)
@@ -358,10 +398,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool EglenSummon()
         {
-            if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Robina) || Bot.HasInBanished(CardId.Robina)))
-                return true;
-
-            return false;
+            return Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() > 1;
         }
 
         private bool SnowlActivate()
@@ -574,22 +611,47 @@ namespace WindBot.Game.AI.Decks
         {
             if (Card.Location == CardLocation.MonsterZone)
             {
+                if (Bot.HasInBanished(CardId.UnexploredWinds))
+                    AI.SelectCard(CardId.UnexploredWinds);
+                else if (Bot.HasInBanished(CardId.DreamingTown))
+                    AI.SelectCard(CardId.DreamingTown);
+                else
+                {
+                    AI.SelectNextCard(new int[] {
+                                CardId.AdventOfAdventure,
+                                CardId.Empen,
+                                CardId.Avian,
+                                CardId.MagnificentMap
+                            });
 
-                int[] preffererdCards = Bot.Banished.GetMatchingCards(card =>
-                                                        card.Level > 6
-                                                        || card.IsCode(CardId.MagnificentMap)
-                                                        || card.IsCode(CardId.UnexploredWinds)
-                                                    ).Select(c => c.Id).ToArray();
+                    toccan_NormalSummonEffectActivated = true;
+                    return true;
+                }
 
-                if (Bot.HasInBanished(CardId.Robina)) AI.SelectCard(CardId.Robina);
+                // Normal Summon again?
+                int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 7).Select(c => c.Id).ToArray();
+                int[] materials = Bot.Hand.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
 
+                // summon boss monsters
+                if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
+                {
+                    AI.SelectYesNo(true);
 
-                if (Bot.HasInBanished(CardId.DreamingTown)) AI.SelectCard(CardId.DreamingTown);
-                else AI.SelectCard(preffererdCards);
-
-                stri_NormalSummonEffectActivated = true;
-
-                return true;
+                    AI.SelectCard(hand_bossMonsters);
+                    AI.SelectMaterials(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray());
+                } else if (Bot.Deck.GetCardCount(CardId.Stri) > 0
+                        && (Bot.HasInGraveyard(CardId.DreamingTown)
+                            || Bot.HasInGraveyard(CardId.UnexploredWinds)
+                            || Bot.HasInGraveyard(CardId.AdventOfAdventure)
+                            || Bot.HasInGraveyard(CardId.Empen)
+                            || Bot.HasInGraveyard(CardId.Avian)
+                            || Bot.HasInGraveyard(CardId.MagnificentMap)
+                       ))
+                {
+                    AI.SelectYesNo(true);
+                    AI.SelectCard(CardId.Stri);
+                }
+                else AI.SelectYesNo(false);
             }
 
             return false;
@@ -614,8 +676,8 @@ namespace WindBot.Game.AI.Decks
                 // reveal robina
                 AI.SelectCard(CardId.Robina);
 
-                if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Toccan) || Bot.HasInBanished(CardId.Toccan)))
-                    AI.SelectCard(CardId.Toccan);
+                if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Toccan) || Bot.HasInBanished(CardId.Toccan))) AI.SelectNextCard(CardId.Toccan);
+                else if (eglen_NormalSummonEffectActivated && !Bot.HasInHand(CardId.Eglen)) AI.SelectNextCard(CardId.Eglen);
                 else AI.SelectNextCard(CardId.Stri);
 
                 return true;
@@ -747,46 +809,8 @@ namespace WindBot.Game.AI.Decks
                 {
                     if (eglen_NormalSummonEffectActivated)
                     {
-                        int[] otherPrefferedCards = new int[]
-                        {
-                            CardId.Stri,
-                            CardId.Toccan,
-                            CardId.Robina,
-                            CardId.Eglen
-                        };
+                        int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 7).Select(c => c.Id).ToArray();
 
-                        int[] hand_bossMonsters = Bot.Hand.GetMatchingCards(card => card.Level > 5).Select(c => c.Id).ToArray();
-                        int[] materials = Bot.Hand.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray();
-
-                        // summon boss monsters
-                        if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
-                        {
-                            AI.SelectCard(hand_bossMonsters);
-                            AI.SelectMaterials(Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Select(c => c.Id).ToArray());
-                        }
-
-                        if (Bot.Deck.GetCardCount(CardId.Toccan) > 0 && Bot.Banished.Count() > 0)
-                        {
-                            AI.SelectCard(CardId.Toccan);
-                            AI.SelectNextCard(CardId.Toccan);
-                        }
-                        else if (Bot.Deck.GetCardCount(CardId.Stri) > 0 && Bot.Graveyard.Count() > 0)
-                        {
-                            AI.SelectCard(CardId.Toccan);
-                            AI.SelectNextCard(CardId.Toccan);
-                        }
-                        else
-                        {
-                            AI.SelectCard(otherPrefferedCards);
-                            if (!eglen_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Eglen);
-                            else if (!stri_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Stri);
-                            else if (!toccan_NormalSummonEffectActivated) AI.SelectNextCard(CardId.Toccan);
-                        }
-
-                        return true;
-                    }
-                    else
-                    {
                         List<int> materials = new List<int>();
                         materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1)
                                         .Select(x => x.Id)
@@ -802,12 +826,21 @@ namespace WindBot.Game.AI.Decks
                             materials.Add(Util.GetBestEnemyCard().Id);
                         }
 
-                        // Summon empen
-                        if(Bot.HasInHand(CardId.Empen)) AI.SelectNextCard(CardId.Empen);
-                        else if(Bot.HasInHand(CardId.Avian)) AI.SelectNextCard(CardId.Empen);
-                        else if (Bot.HasInHand(CardId.Snowl)) AI.SelectNextCard(CardId.Snowl);
+                        // summon boss monsters
+                        if (hand_bossMonsters.Count() > 0 && materials.Count() > 1)
+                        {
+                            AI.SelectYesNo(true);
 
-                        AI.SelectMaterials(materials);
+                            // Summon empen
+                            if (Bot.HasInHand(CardId.Empen)) AI.SelectNextCard(CardId.Empen);
+                            else if (Bot.HasInHand(CardId.Avian)) AI.SelectNextCard(CardId.Avian);
+                            else if (Bot.HasInHand(CardId.Snowl)) AI.SelectNextCard(CardId.Snowl);
+
+                            AI.SelectMaterials(materials);
+                        }
+                        else AI.SelectYesNo(false);
+
+                        return true;
                     }
 
                     robina_NormalSummonEffectActivated = true;
