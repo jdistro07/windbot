@@ -1,13 +1,6 @@
 using YGOSharp.OCGWrapper.Enums;
 using System.Collections.Generic;
 using System.Linq;
-using System;
-using System.Threading;
-using System.Configuration;
-using YGOSharp.OCGWrapper;
-using YGOSharp.Network.Enums;
-using WindBot.Game.AI.Enums;
-using System.Diagnostics.Eventing.Reader;
 
 namespace WindBot.Game.AI.Decks
 {
@@ -108,6 +101,9 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.SpSummon, CardId.Zeus, ZeusSpSummon);
             AddExecutor(ExecutorType.Activate, CardId.Zeus, ZeusEffect);
 
+            // Link summons
+            AddExecutor(ExecutorType.SpSummon, CardId.UnderworldGoddess, LinkUnderworldGoddess);
+
             AddExecutor(ExecutorType.Summon, CardId.Snowl, SnowlSummon);
             AddExecutor(ExecutorType.Summon, CardId.Avian, AvianSummon);
             AddExecutor(ExecutorType.Summon, CardId.Empen, EmpenSummon);
@@ -154,6 +150,27 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Repos, CardId.GustavMax, BossMonsterRepos);
             AddExecutor(ExecutorType.Repos, CardId.JuggernautLiebe, BossMonsterRepos);
             AddExecutor(ExecutorType.Repos, CardId.Zeus, BossMonsterRepos);
+        }
+
+        private bool LinkUnderworldGoddess()
+        {
+            if (Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).Count() >= 4 && Enemy.MonsterZone.Count() > 0)
+            {
+                List<ClientCard> materials = Bot.MonsterZone.GetMatchingCards(card => card.Level == 1).ToList();
+                ClientCard enemyBestMonster = Util.GetBestEnemyMonster();
+
+                if (enemyBestMonster != null)
+                {
+                    materials.Add(enemyBestMonster);
+                    AI.SelectMaterials(materials);
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
         }
 
         private bool SlackerdMagicianActivate()
@@ -395,10 +412,12 @@ namespace WindBot.Game.AI.Decks
                 AI.SelectPlace(SelectSTPlace(Bot.Hand.GetFirstMatchingCard(card => Card.IsCode(CardId.Robina))));
             }
 
-            return Card.Location == CardLocation.SpellZone
+            return (Card.Location == CardLocation.SpellZone
                     && Duel.Player == 1
                     && Bot.Hand.ContainsMonsterWithLevel(1)
-                    && !MagnificentMapActivated;
+                    && !MagnificentMapActivated
+                    && Enemy.MonsterZone.Count() >= 1)
+                    || Util.IsChainTarget(Card);
         }
 
         private bool DowneredMagicianSpSummon()
@@ -489,7 +508,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool TrippleTacticsThrustActivate()
         {
-            if (Bot.Deck.GetCardCount(CardId.TrippleTacticsTalent) > 0) AI.SelectCard(CardId.TrippleTacticsTalent);
+            if (!Bot.HasInHand(CardId.TrippleTacticsTalent)) AI.SelectCard(CardId.TrippleTacticsTalent);
             else if (!(Bot.HasInHandOrHasInMonstersZone(CardId.Robina) || Bot.HasInBanished(CardId.Robina)))
             {
                 if (PotOfProsperityActivated) AI.SelectCard(CardId.PotOfDuality);
@@ -759,6 +778,25 @@ namespace WindBot.Game.AI.Decks
         {
             if (Util.GetLastChainCard() == Card) return false;
 
+            // Material attachment effect
+            if (Duel.Player == 0 && ActivateDescription == Util.GetStringId(CardId.Zeus, 0))
+            {
+                List<int> prefferedAttachments = new List<int>();
+
+                if (Bot.Deck.GetFirstMatchingCard(card => card.IsCode(CardId.TrippleTacticsTalent)) != null)
+                    prefferedAttachments.Add(CardId.TrippleTacticsThrust);
+                else if (Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.BookOfMoon)).Count() > 1)
+                    prefferedAttachments.Add(CardId.BookOfMoon);
+                else
+                    prefferedAttachments.AddRange(new List<int> {
+                        CardId.RaizaMegaMonarch,
+                        CardId.DimensionShifter
+                    });
+
+                if (prefferedAttachments.Count() > 0)
+                    return true;
+            }
+
             if ((Util.IsAllEnemyBetter() || Util.IsChainTarget(Card) || Enemy.GetFieldCount() >= 3) && (Duel.Player == 0 || Duel.Player == 1) && !Card.IsDisabled())
                 return true;
 
@@ -767,12 +805,6 @@ namespace WindBot.Game.AI.Decks
 
         private bool JuggernautLiebeSummon()
         {
-            if (Bot.MonsterZone.GetFirstMatchingCard(card => card.HasType(CardType.Xyz) && card.Rank == 10) != null)
-            {
-                int xyzPosition = Bot.MonsterZone.GetFirstMatchingCard(card => card.HasType(CardType.Xyz) && card.Rank == 10).Position;
-                AI.SelectPlace(xyzPosition);
-            }
-            
             return true;
         }
 
@@ -840,8 +872,7 @@ namespace WindBot.Game.AI.Decks
 
         private bool DreamingTownGraveyardActivate()
         {
-            return Card.Location == CardLocation.Grave
-                    && Util.IsAllEnemyBetter();
+            return Card.Location == CardLocation.Grave;
         }
 
         private bool ToccanBanishedEffect()
