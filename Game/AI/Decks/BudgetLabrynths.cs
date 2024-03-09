@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting;
+using System.Threading;
 using System.Web.UI;
 using YGOSharp.OCGWrapper.Enums;
 
@@ -18,6 +20,11 @@ namespace WindBot.Game.AI.Decks
         //Chain target variables
         private bool LovelyIsChainTarget = false;
         private bool LadyIsChainTarget = false;
+
+        //Furniture Monster Zone activations
+        private bool MonsterZoneQE_StovieTorbieEffect = false;
+        private bool MonsterZoneQE_ChandraglierEffect = false;
+
 
         public BudgetLabrynths(GameAI ai, Duel duel)
         : base(ai, duel)
@@ -37,8 +44,9 @@ namespace WindBot.Game.AI.Decks
 
             // Furntures
             AddExecutor(ExecutorType.Activate, CardId.STOVIE_TORBIE, StovieTorbieEffect);
-
+            AddExecutor(ExecutorType.Activate, CardId.STOVIE_TORBIE, MonsterZone_StovieTorbieEffect);
             AddExecutor(ExecutorType.Activate, CardId.CHANDRAGLIER, ChandraglierEffect);
+            AddExecutor(ExecutorType.Activate, CardId.CHANDRAGLIER, MonsterZone_ChandraglierEffect);
 
             //Labrynth Spell Traps
             AddExecutor(ExecutorType.Activate, CardId.LABRYNTH_LABYRINTH, LabrynthLabyrinthActivate);
@@ -93,6 +101,51 @@ namespace WindBot.Game.AI.Decks
             // Finalize monster positions
             AddExecutor(ExecutorType.Repos, CardId.LADY_LABRYNTH, LadyLabrynthRepos);
             AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
+        }
+
+        public override bool OnPreBattleBetween(ClientCard attacker, ClientCard defender)
+        {
+            //Empen
+            if (attacker.IsCode(CardId.STOVIE_TORBIE))
+                MonsterZoneQE_StovieTorbieEffect = true;
+
+            //Slacker Magician
+            if (attacker.IsCode(CardId.CHANDRAGLIER))
+                MonsterZoneQE_ChandraglierEffect = true;
+
+            return base.OnPreBattleBetween(attacker, defender);
+        }
+
+        private bool MonsterZone_ChandraglierEffect()
+        {
+            return FurnitureActivateQEWhenTargeted(MonsterZoneQE_ChandraglierEffect, Card);
+        }
+
+        private bool FurnitureActivateQEWhenTargeted(bool activateQE, ClientCard targetedCard)
+        {
+            if (Card.Location == CardLocation.MonsterZone)
+            {
+                int available_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
+                int available_Labrynth_Labrynths = !Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH) ? 0 : Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.LABRYNTH_LABYRINTH)).Count();
+
+                int availableSearchables = available_welcomes + available_Labrynth_Labrynths;
+
+                if (Util.IsChainTarget(targetedCard) && availableSearchables > 0)
+                    return true;
+
+                if (Enemy.BattlingMonster != null)
+                {
+                    if (Enemy.BattlingMonster.IsCode(targetedCard.Id) && activateQE)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool MonsterZone_StovieTorbieEffect()
+        {
+            return FurnitureActivateQEWhenTargeted(MonsterZoneQE_StovieTorbieEffect, Card);
         }
 
         private bool Grave_CooclockEffect()
@@ -569,11 +622,9 @@ namespace WindBot.Game.AI.Decks
             }
 
             // Protect Key Monsters
-            if (LovelyIsChainTarget || LadyIsChainTarget)
+            if (ActivateDescription == Util.GetStringId(CardId.MUCKRACKER, 0))
             {
-                if (ActivateDescription == Util.GetStringId(CardId.MUCKRACKER, 0))
-                {
-                    List<int> cost_candidates = new List<int>()
+                List<int> cost_candidates = new List<int>()
                     {
                         CardId.CHANDRAGLIER,
                         CardId.STOVIE_TORBIE,
@@ -582,15 +633,17 @@ namespace WindBot.Game.AI.Decks
                         CardId.MUCKRACKER
                     };
 
-                    if (Enemy.BattlingMonster != null)
+                if (Enemy.BattlingMonster != null)
+                {
+                    if(LovelyIsChainTarget || LadyIsChainTarget && Duel.LastChainPlayer != 0)
+                        return true;
+
+                    if (Enemy.BattlingMonster.IsCode(CardId.LOVELY_LABRYNTH) || Enemy.BattlingMonster.IsCode(CardId.LOVELY_LABRYNTH))
                     {
-                        if (Enemy.BattlingMonster.IsCode(CardId.LOVELY_LABRYNTH) || Enemy.BattlingMonster.IsCode(CardId.LOVELY_LABRYNTH))
-                        {
-                            AI.SelectThirdCard(cost_candidates);
-                            return true;
-                        }
-                        return false;
+                        AI.SelectThirdCard(cost_candidates);
+                        return true;
                     }
+                    return false;
                 }
             }
 
@@ -740,6 +793,9 @@ namespace WindBot.Game.AI.Decks
 
             LovelyIsChainTarget = false;
             LadyIsChainTarget = false;
+
+            MonsterZoneQE_StovieTorbieEffect = false;
+            MonsterZoneQE_ChandraglierEffect = false;
     }
 
         public override CardPosition OnSelectPosition(int CardID, IList<CardPosition> positions)
