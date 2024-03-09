@@ -103,25 +103,7 @@ namespace WindBot.Game.AI.Decks
             AddExecutor(ExecutorType.Repos, CardId.ARIANNA, AriannaRepos);
         }
 
-        public override bool OnPreBattleBetween(ClientCard attacker, ClientCard defender)
-        {
-            //Empen
-            if (attacker.IsCode(CardId.STOVIE_TORBIE))
-                MonsterZoneQE_StovieTorbieEffect = true;
-
-            //Slacker Magician
-            if (attacker.IsCode(CardId.CHANDRAGLIER))
-                MonsterZoneQE_ChandraglierEffect = true;
-
-            return base.OnPreBattleBetween(attacker, defender);
-        }
-
         private bool MonsterZone_ChandraglierEffect()
-        {
-            return FurnitureActivateQEWhenTargeted(MonsterZoneQE_ChandraglierEffect, Card);
-        }
-
-        private bool FurnitureActivateQEWhenTargeted(bool activateQE, ClientCard targetedCard)
         {
             if (Card.Location == CardLocation.MonsterZone)
             {
@@ -130,12 +112,12 @@ namespace WindBot.Game.AI.Decks
 
                 int availableSearchables = available_welcomes + available_Labrynth_Labrynths;
 
-                if (Util.IsChainTarget(targetedCard) && availableSearchables > 0)
+                if (Util.IsChainTarget(Card) && availableSearchables > 0)
                     return true;
 
                 if (Enemy.BattlingMonster != null)
                 {
-                    if (Enemy.BattlingMonster.IsCode(targetedCard.Id) && activateQE)
+                    if (Enemy.BattlingMonster.IsCode(Card.Id) && availableSearchables > 0)
                         return true;
                 }
             }
@@ -145,7 +127,24 @@ namespace WindBot.Game.AI.Decks
 
         private bool MonsterZone_StovieTorbieEffect()
         {
-            return FurnitureActivateQEWhenTargeted(MonsterZoneQE_StovieTorbieEffect, Card);
+            if (Card.Location == CardLocation.MonsterZone)
+            {
+                int available_welcomes = Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.WELCOME_LABYRINTH)).Count();
+                int available_Labrynth_Labrynths = !Bot.HasInSpellZone(CardId.LABRYNTH_LABYRINTH) ? 0 : Bot.Deck.GetMatchingCards(card => card.IsCode(CardId.LABRYNTH_LABYRINTH)).Count();
+
+                int availableSearchables = available_welcomes + available_Labrynth_Labrynths;
+
+                if (Util.IsChainTarget(Card) && availableSearchables > 0)
+                    return true;
+
+                if (Enemy.BattlingMonster != null)
+                {
+                    if (Enemy.BattlingMonster.IsCode(Card.Id) && availableSearchables > 0)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private bool Grave_CooclockEffect()
